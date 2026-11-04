@@ -1,0 +1,61 @@
+import{a as e,c as t,i as n,o as r,r as i,s as a,t as o}from"./shopApi.CEIJ1A2K.js";var s=document.querySelector(`[data-shop]`),c=JSON.parse(s.dataset.config),l=c.t,u=o(c.lang,{categories:c.categories,products:c.products}),d=e=>s.querySelector(e),f=d(`[data-view="gate"]`),p=d(`[data-app]`),m=d(`[data-bar]`),h=d(`[data-live]`),g={catalog:d(`[data-view="catalog"]`),cart:d(`[data-view="cart"]`),orders:d(`[data-view="orders"]`)},_=null,v=a(i.cart,{}),y=c.categories,b=[],x=new Map,S=`catalog`,C=`all`,w=``,T=``,E=``,D=()=>Object.values(v).reduce((e,t)=>e+t,0),O=()=>t(i.cart,v),k=e=>{h.textContent=``,setTimeout(()=>h.textContent=e,30)},A=e=>e.normalize(`NFD`).replace(/\p{M}/g,``).toLowerCase(),j=e=>{let t=e instanceof Error?e.message:``;return t.startsWith(`out_of_stock`)?l.errors.outOfStock:t.startsWith(`too_many_open_orders`)?l.errors.tooMany:t===`rate_limited`?l.errors.rateLimited:t===`send_failed`?l.errors.sendFailed:t===`weak_password`?l.errors.weakPassword:t===`bad_login`?l.gate.badLogin:t===`not_confirmed`?l.gate.notConfirmed:l.errors.generic};async function M(e,t){let n=e.querySelectorAll(`button`);n.forEach(e=>e.disabled=!0);try{await t()}finally{n.forEach(e=>e.disabled=!1)}}async function N(){let e=await u.loadCatalog();y=e.categories,b=e.products,x=new Map(b.map(e=>[e.id,e]))}var P={login:d(`[data-step="login"]`),signup:d(`[data-step="signup"]`),check:d(`[data-step="check"]`),forgot:d(`[data-step="forgot"]`),newpass:d(`[data-step="newpass"]`)},F=d(`[data-tabs]`),I=e=>{Object.keys(P).forEach(t=>P[t].hidden=t!==e),F.hidden=e!==`login`&&e!==`signup`,F.querySelectorAll(`[data-tab]`).forEach(t=>t.setAttribute(`aria-selected`,String(t.dataset.tab===e))),P[e].querySelector(`input`)?.focus()},L=(e,t)=>{e.querySelector(`[data-err]`).textContent=t},R=e=>/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e.trim()),z=``;F.addEventListener(`click`,e=>{let t=e.target.closest(`[data-tab]`);t&&I(t.dataset.tab)}),s.querySelectorAll(`[data-to-login]`).forEach(e=>e.addEventListener(`click`,()=>I(`login`))),s.querySelector(`[data-forgot]`)?.addEventListener(`click`,()=>I(`forgot`)),P.login.addEventListener(`submit`,e=>{e.preventDefault();let t=P.login;if(L(t,``),!R(t.email.value)||!t.password.value)return L(t,l.gate.badLogin);M(t,async()=>{try{B(await u.signIn(t.email.value,t.password.value)),t.reset()}catch(e){L(t,j(e))}})}),P.signup.addEventListener(`submit`,t=>{t.preventDefault();let n=P.signup;L(n,``);let r=n.first.value.trim();if(!r)return L(n,l.gate.badName);if(!R(n.email.value))return L(n,l.gate.badEmail);if(n.password.value.length<8)return L(n,l.gate.badPassword);M(n,async()=>{try{if(!(await u.signUp(n.email.value,n.password.value,r,n.last.value.trim())).needsConfirm){let e=await u.restoreSession();if(e)return B(e)}z=n.email.value.trim().toLowerCase(),P.check.querySelector(`[data-check-text]`).textContent=e(l.gate.checkText,{email:z}),n.reset(),I(`check`)}catch(e){L(n,j(e))}})}),P.check.querySelector(`[data-demo-confirm]`)?.addEventListener(`click`,async()=>{await u.demoConfirm?.(z),P.login.email.value=z,I(`login`)}),P.forgot.addEventListener(`submit`,e=>{e.preventDefault();let t=P.forgot;if(L(t,``),!R(t.email.value))return L(t,l.gate.badEmail);M(t,async()=>{try{await u.resetPassword(t.email.value),L(t,l.gate.forgotSent)}catch(e){L(t,j(e))}})}),u.onPasswordRecovery(()=>{f.hidden=!1,p.hidden=!0,I(`newpass`)}),P.newpass.addEventListener(`submit`,e=>{e.preventDefault();let t=P.newpass;if(L(t,``),t.password.value.length<8)return L(t,l.gate.badPassword);M(t,async()=>{try{await u.setNewPassword(t.password.value),t.reset();let e=await u.restoreSession();e?B(e):I(`login`)}catch(e){L(t,j(e))}})});function B(e){_=e,v={},O(),H(`catalog`)}async function V(){await u.signOut(),_=null,v={},O(),f.hidden=!1,p.hidden=!0,I(`login`)}async function H(e){S=e,await U(),window.scrollTo({top:s.offsetTop-80,behavior:`smooth`})}async function U(){if(!_)f.hidden=!1,p.hidden=!0;else{f.hidden=!0,p.hidden=!1,Object.keys(g).forEach(e=>g[e].hidden=e!==S);try{await N()}catch{g[S].innerHTML=`<p class="notice">${l.errors.generic}</p>`;return}W(),S===`catalog`&&J(),S===`cart`&&Z(),S===`orders`&&await ee()}}function W(){let t=D(),r=(e,t,n=``)=>`<button type="button" class="tab" data-go="${e}" ${S===e?`aria-current="page"`:``}>${t}${n}</button>`;m.innerHTML=`
+      <p class="hello">${n(e(l.bar.hello,{name:_.first}))}</p>
+      <div class="tabs">
+        ${r(`catalog`,l.bar.catalog)}
+        ${r(`cart`,l.bar.cart,t?` <span class="badge">${t}</span>`:``)}
+        ${r(`orders`,l.bar.orders)}
+        <button type="button" class="tab quiet" data-out>${l.bar.out}</button>
+      </div>`}m.addEventListener(`click`,e=>{let t=e.target.closest(`[data-go],[data-out]`);t&&(T=``,E=``,t.hasAttribute(`data-out`)?V():H(t.dataset.go))});function G(e){return e===0?`<span class="stock out">${l.catalog.soldOut}</span>`:e<=3?`<span class="stock low">${l.catalog.last}</span>`:``}function K(e){let t=e.stock,i=t-(v[e.id]??0),a=c.showPrices?`<span class="price">${r(e.price,c.lang)}</span>`:``,o=e.tags.map(e=>`<span class="tag">${n(e)}</span>`).join(``),s=t===0?``:`<div class="buy">
+            <div class="qty" role="group" aria-label="${n(e.name)}">
+              <button type="button" data-act="dec" aria-label="${l.catalog.less}">−</button>
+              <output data-q>1</output>
+              <button type="button" data-act="inc" aria-label="${l.catalog.more}">+</button>
+            </div>
+            <button type="button" class="btn btn-primary add" data-act="add" ${i<=0?`disabled`:``}>${i<=0?l.catalog.max:l.catalog.add}</button>
+          </div>`;return`<li class="card ${t===0?`is-out`:``}" data-id="${n(e.id)}">
+      <div class="ph" aria-hidden="true"><span>${l.catalog.photo}</span></div>
+      <div class="card-body">
+        <div class="card-head"><h3>${n(e.name)}</h3>${a}</div>
+        <p class="format">${n(e.format)}</p>
+        <p class="tags">${o}${G(t)}</p>
+        ${s}
+      </div>
+    </li>`}function q(){let e=A(w.trim());return b.filter(t=>(C===`all`||t.category===C)&&(!e||A(`${t.name} ${t.format}`).includes(e)))}function J(){let e=(e,t,r)=>`<button type="button" class="chip" data-cat="${n(e)}" aria-pressed="${C===e}">${n(t)} <span>${r}</span></button>`;g.catalog.innerHTML=`
+      ${u.live?``:`<p class="sample-note">${l.catalog.sample}</p>`}
+      <label class="visually-hidden" for="shop-search">${l.catalog.search}</label>
+      <input id="shop-search" class="search" type="search" placeholder="${l.catalog.search}" value="${n(w)}" autocomplete="off" />
+      <div class="chips">
+        ${e(`all`,l.catalog.all,b.length)}
+        ${y.map(t=>e(t.id,t.name,b.filter(e=>e.category===t.id).length)).join(``)}
+      </div>
+      <ul class="grid" data-grid></ul>`,Y()}function Y(){let e=q();d(`[data-grid]`).innerHTML=e.length?e.map(K).join(``):`<li class="none">${l.catalog.none}</li>`}g.catalog.addEventListener(`input`,e=>{let t=e.target;t.id===`shop-search`&&(w=t.value,Y())}),g.catalog.addEventListener(`click`,e=>{let t=e.target,n=t.closest(`[data-cat]`);if(n){C=n.dataset.cat,g.catalog.querySelectorAll(`[data-cat]`).forEach(e=>e.setAttribute(`aria-pressed`,String(e===n))),Y();return}let r=t.closest(`[data-act]`),i=r?.closest(`[data-id]`);if(!r||!i)return;let a=x.get(i.dataset.id);if(!a)return;let o=i.querySelector(`[data-q]`),s=a.stock-(v[a.id]??0),c=Number(o.value);if(r.dataset.act===`dec`&&(o.value=String(Math.max(1,c-1))),r.dataset.act===`inc`&&(o.value=String(Math.min(Math.max(s,1),c+1))),r.dataset.act===`add`){if(c=Math.min(c,s),c<1)return;v[a.id]=(v[a.id]??0)+c,O(),W(),k(`${l.catalog.added} : ${a.name} × ${c}`),i.outerHTML=K(a),g.catalog.querySelector(`[data-id="${CSS.escape(a.id)}"] .add`)?.classList.add(`flash`)}});function X(){let e=!1;for(let t of Object.keys(v)){let n=x.get(t),r=n?n.stock:0;(!n||v[t]>r)&&(e=!0,r>0?v[t]=r:delete v[t])}e&&(O(),E=l.cart.changed)}function Z(){X(),W();let t=Object.keys(v);if(!t.length){g.cart.innerHTML=`<h2>${l.cart.title}</h2>${E?`<p class="notice">${E}</p>`:``}<p class="empty">${l.cart.empty}</p>
+        <button type="button" class="btn btn-ghost" data-go-catalog>${l.cart.back}</button>`,E=``;return}let i=0,a=t.map(e=>{let t=x.get(e);i+=t.price*v[e];let a=t.stock-v[e];return`<li class="line" data-id="${n(e)}">
+          <div><strong>${n(t.name)}</strong><span class="format">${n(t.format)}</span></div>
+          <div class="qty" role="group" aria-label="${n(t.name)}">
+            <button type="button" data-act="dec" aria-label="${l.catalog.less}">−</button>
+            <output>${v[e]}</output>
+            <button type="button" data-act="inc" aria-label="${l.catalog.more}" ${a<=0?`disabled`:``}>+</button>
+          </div>
+          ${c.showPrices?`<span class="price">${r(t.price*v[e],c.lang)}</span>`:``}
+          <button type="button" class="link" data-act="del">${l.cart.remove}</button>
+        </li>`}).join(``);g.cart.innerHTML=`
+      <h2>${l.cart.title}</h2>
+      ${E?`<p class="notice">${E}</p>`:``}
+      <ul class="lines">${a}</ul>
+      <label for="shop-note">${l.cart.note}</label>
+      <textarea id="shop-note" rows="2" maxlength="200" placeholder="${l.cart.notePh}"></textarea>
+      <p class="hint">${n(e(l.cart.pickup,{hours:c.hours}))}</p>
+      ${c.showPrices?`<p class="total"><span>${l.cart.total}</span><strong>${r(i,c.lang)}</strong></p>`:``}
+      <div class="row">
+        <button type="button" class="btn btn-primary" data-send>${l.cart.send}</button>
+        <button type="button" class="btn btn-ghost" data-go-catalog>${l.cart.back}</button>
+      </div>`,E=``}g.cart.addEventListener(`click`,e=>{let t=e.target;if(t.closest(`[data-go-catalog]`))return void H(`catalog`);if(t.closest(`[data-send]`))return void Q();let n=t.closest(`[data-act]`),r=n?.closest(`[data-id]`);if(!n||!r)return;let i=r.dataset.id,a=g.cart.querySelector(`#shop-note`)?.value??``;n.dataset.act===`inc`&&(v[i]=(v[i]??0)+1),n.dataset.act===`dec`&&(v[i]=(v[i]??1)-1),(n.dataset.act===`del`||v[i]<=0)&&delete v[i],O(),Z();let o=g.cart.querySelector(`#shop-note`);o&&(o.value=a)});async function Q(){let t=Object.keys(v);if(!t.length||!_)return;let n=(g.cart.querySelector(`#shop-note`)?.value??``).trim(),r=g.cart.querySelector(`[data-send]`);r&&(r.disabled=!0);try{let r=await u.placeOrder(t.map(e=>({id:e,qty:v[e]})),n);v={},O(),T=e(l.orders.thanks,{id:r.number}),await H(`orders`)}catch(e){E=j(e),await U()}}async function ee(){W();let t=[];try{t=await u.myOrders()}catch{g.orders.innerHTML=`<p class="notice">${l.errors.generic}</p>`;return}let r=new Intl.DateTimeFormat(c.lang===`fr`?`fr-CA`:`en-CA`,{dateStyle:`medium`,timeStyle:`short`,timeZone:`America/Toronto`}),i=t.map(t=>{let i=t.items.map(e=>`<li>${e.qty} × ${n(e.name)} <span class="format">${n(e.format)}</span></li>`).join(``),a=t.status===`new`?`<button type="button" class="link" data-cancel="${n(t.id)}">${l.orders.cancel}</button>`:``;return`<li class="order">
+          <div class="order-head"><strong>${n(t.number)}</strong><span class="status s-${t.status}">${l.statuses[t.status]}</span></div>
+          <p class="format">${n(e(l.orders.placed,{date:r.format(new Date(t.createdAt))}))}</p>
+          <ul class="items">${i}</ul>
+          ${t.note?`<p class="format">${l.orders.note} : ${n(t.note)}</p>`:``}
+          <div class="row"><button type="button" class="btn btn-ghost" data-again="${n(t.id)}">${l.orders.again}</button>${a}</div>
+        </li>`}).join(``);g.orders.innerHTML=`
+      <h2>${l.orders.title}</h2>
+      ${T?`<p class="notice ok" role="status">${n(T)}</p>`:``}
+      ${t.length?`<ul class="orders">${i}</ul>`:`<p class="empty">${l.orders.empty}</p>`}`,T=``,$=t}var $=[];g.orders.addEventListener(`click`,async e=>{let t=e.target,n=t.closest(`[data-cancel]`),r=t.closest(`[data-again]`);if(n){try{await u.cancelOrder(n.dataset.cancel)}catch{}await U()}r&&($.find(e=>e.id===r.dataset.again)?.items.forEach(e=>{let t=x.get(e.id);if(!t)return;let n=t.stock-(v[e.id]??0);n>0&&(v[e.id]=(v[e.id]??0)+Math.min(e.qty,n))}),O(),E=``,H(`cart`))}),u.onChange(()=>{_&&S===`orders`&&U()}),u.restoreSession().then(e=>{_=e,e?U():I(`login`)}).catch(()=>I(`login`));
