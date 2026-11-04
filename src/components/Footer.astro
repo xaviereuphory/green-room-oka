@@ -1,0 +1,159 @@
+---
+import { site, fullAddress, directionsUrl } from '../data/site';
+import { routes, ui, hoursLabel, type Lang } from '../i18n/ui';
+
+interface Props {
+  lang: Lang;
+}
+
+const { lang } = Astro.props;
+const t = ui[lang];
+const year = new Date().getFullYear();
+---
+
+<footer class="footer">
+  <div class="container">
+    <div class="top">
+      <a href={routes.home[lang]} class="wordmark">The Green Room</a>
+      <p class="place">{site.address.city} · {site.address.community}</p>
+    </div>
+
+    <div class="grid">
+      <div>
+        <h2 class="col-title">{t.footer.hours}</h2>
+        <p>{t.visit.everyDay}</p>
+        <p class="muted">{hoursLabel(lang)}</p>
+      </div>
+
+      <div>
+        <h2 class="col-title">{t.visit.addressTitle}</h2>
+        <p><a href={directionsUrl} target="_blank" rel="noopener">{fullAddress}</a></p>
+      </div>
+
+      <div>
+        <h2 class="col-title">{t.footer.contact}</h2>
+        <p><a href={site.phoneHref}>{site.phone}</a></p>
+        <p><a href={`mailto:${site.email}`}>{site.email}</a></p>
+      </div>
+
+      <div>
+        <h2 class="col-title">{t.footer.follow}</h2>
+        <ul class="socials">
+          {site.socials.map((s) => (
+            <li><a href={s.href} target="_blank" rel="noopener">{s.name}</a></li>
+          ))}
+        </ul>
+      </div>
+    </div>
+
+    <div class="bottom">
+      <p>© {year} {site.name}. {t.footer.rights}</p>
+      <p class="age">{t.footer.ageNote}</p>
+    </div>
+  </div>
+</footer>
+
+<style>
+  .footer {
+    border-top: 1px solid var(--line);
+    background: var(--surface);
+    padding-block: 64px 32px;
+    font-size: 0.95rem;
+  }
+
+  .top {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    padding-bottom: 40px;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .wordmark {
+    font-family: var(--font-display);
+    font-size: clamp(2rem, 6vw, 3.5rem);
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+    line-height: 1;
+    text-decoration: none;
+  }
+
+  .place {
+    color: var(--muted);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    font-size: 0.78rem;
+  }
+
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 32px;
+    padding-block: 40px;
+  }
+
+  .col-title {
+    font-family: var(--font-body);
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.16em;
+    color: var(--accent);
+    margin-bottom: 14px;
+  }
+
+  .grid p + p {
+    margin-top: 4px;
+  }
+
+  .grid a {
+    text-decoration: none;
+    overflow-wrap: anywhere;
+  }
+
+  .grid a:hover {
+    color: var(--accent);
+  }
+
+  .muted {
+    color: var(--muted);
+  }
+
+  .socials {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 14px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .bottom {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 8px;
+    padding-top: 24px;
+    border-top: 1px solid var(--line);
+    font-size: 0.82rem;
+    color: var(--muted);
+  }
+
+  .age {
+    color: var(--text);
+  }
+
+  @media (max-width: 900px) {
+    .grid {
+      grid-template-columns: 1fr 1fr;
+    }
+  }
+
+  @media (max-width: 520px) {
+    .grid {
+      grid-template-columns: 1fr;
+      gap: 28px;
+    }
+  }
+</style>

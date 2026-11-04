@@ -1,0 +1,99 @@
+---
+import '../styles/global.css';
+import Header from '../components/Header.astro';
+import Footer from '../components/Footer.astro';
+import AgeGate from '../components/AgeGate.astro';
+import { site } from '../data/site';
+import { routes, ui, withBase, type Lang, type PageKey } from '../i18n/ui';
+
+interface Props {
+  lang: Lang;
+  page: PageKey;
+  overlayHeader?: boolean;
+}
+
+const { lang, page, overlayHeader = false } = Astro.props;
+// Aperçu public : pas d'indexation, et pas de fiche Google « commerce local » (ce n'est pas le vrai site).
+const isPreview = import.meta.env.PUBLIC_PREVIEW === 'true';
+const meta = ui[lang].meta[page];
+const siteUrl = Astro.site ?? new URL('https://thegreenroomoka.ca');
+const canonical = new URL(routes[page][lang], siteUrl).href;
+const alternates = (['fr', 'en'] as const).map((l) => ({ lang: l, href: new URL(routes[page][l], siteUrl).href }));
+
+// Fiche « commerce local » pour Google (heures, adresse, téléphone dans les résultats).
+const jsonLd = {
+  '@context': 'https://schema.org',
+  '@type': 'LocalBusiness',
+  name: site.name,
+  url: siteUrl.href,
+  telephone: `+1-${site.phone}`,
+  email: site.email,
+  address: {
+    '@type': 'PostalAddress',
+    streetAddress: site.address.street,
+    addressLocality: site.address.city,
+    addressRegion: site.address.region,
+    postalCode: site.address.postalCode,
+    addressCountry: site.address.country,
+  },
+  openingHoursSpecification: {
+    '@type': 'OpeningHoursSpecification',
+    dayOfWeek: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'],
+    opens: site.hours.open,
+    closes: site.hours.close === '00:00' ? '23:59' : site.hours.close,
+  },
+  sameAs: site.socials.filter((s) => s.href.startsWith('http')).map((s) => s.href),
+};
+---
+
+<!doctype html>
+<html lang={lang === 'fr' ? 'fr-CA' : 'en-CA'}>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{meta.title}</title>
+    <meta name="description" content={meta.description} />
+    <meta name="theme-color" content="#0a0f0c" />
+    <link rel="canonical" href={canonical} />
+    {alternates.map((a) => <link rel="alternate" hreflang={a.lang} href={a.href} />)}
+    <link rel="alternate" hreflang="x-default" href={alternates[0].href} />
+    <link rel="icon" href={withBase('/favicon.png')} type="image/png" />
+    {isPreview && <meta name="robots" content="noindex, nofollow" />}
+
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content={meta.title} />
+    <meta property="og:description" content={meta.description} />
+    <meta property="og:url" content={canonical} />
+    <meta property="og:locale" content={lang === 'fr' ? 'fr_CA' : 'en_CA'} />
+
+    <script is:inline>
+      // Avant l'affichage : si l'âge a déjà été confirmé, on n'affiche pas la vérification.
+      try {
+        if (localStorage.getItem('gr-age-ok') === '1') document.documentElement.classList.add('age-ok');
+      } catch (e) {}
+    </script>
+
+    {page === 'home' && lang === 'fr' && (
+      <script is:inline define:vars={{ enHome: routes.home.en }}>
+        // Un visiteur qui a déjà choisi l'anglais arrive directement sur l'accueil anglais.
+        try {
+          if (localStorage.getItem('gr-lang') === 'en') location.replace(enHome);
+        } catch (e) {}
+      </script>
+    )}
+
+    {!isPreview && <script type="application/ld+json" set:html={JSON.stringify(jsonLd)} />}
+  </head>
+  <body>
+    <a class="skip-link" href="#main">{ui[lang].skip}</a>
+    <AgeGate lang={lang} page={page} />
+
+    <div id="site">
+      <Header lang={lang} page={page} overlay={overlayHeader} />
+      <main id="main">
+        <slot />
+      </main>
+      <Footer lang={lang} />
+    </div>
+  </body>
+</html>

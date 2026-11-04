@@ -1,0 +1,265 @@
+---
+import LangToggle from './LangToggle.astro';
+import { routes, ui, withBase, type Lang, type PageKey } from '../i18n/ui';
+
+interface Props {
+  lang: Lang;
+  page: PageKey;
+  overlay?: boolean;
+}
+
+const { lang, page, overlay = false } = Astro.props;
+const t = ui[lang].nav;
+const links: { key: PageKey; label: string }[] = [
+  { key: 'home', label: t.home },
+  { key: 'about', label: t.about },
+  { key: 'news', label: t.news },
+  { key: 'events', label: t.events },
+  { key: 'visit', label: t.visit },
+];
+---
+
+<header class:list={['header', { overlay }]} data-header>
+  <div class="container bar">
+    <a href={routes.home[lang]} class="logo" aria-label="The Green Room">
+      <img class="logo-mark" src={withBase('/logo.webp')} alt="" width="36" height="36" />
+      <span class="logo-text">The Green Room</span>
+    </a>
+
+    <nav class="nav" aria-label={t.menu}>
+      <ul id="site-nav">
+        {links.map((l) => (
+          <li>
+            <a href={routes[l.key][lang]} aria-current={l.key === page ? 'page' : undefined}>{l.label}</a>
+          </li>
+        ))}
+      </ul>
+    </nav>
+
+    <div class="actions">
+      <LangToggle lang={lang} page={page} />
+      <button
+        class="menu-btn"
+        type="button"
+        aria-expanded="false"
+        aria-controls="site-nav"
+        data-label-open={t.menu}
+        data-label-close={t.close}
+        data-menu-btn
+      >
+        <span class="bars" aria-hidden="true"><span></span><span></span></span>
+        <span class="visually-hidden" data-menu-label>{t.menu}</span>
+      </button>
+    </div>
+  </div>
+</header>
+
+<script>
+  const header = document.querySelector<HTMLElement>('[data-header]');
+  const btn = document.querySelector<HTMLButtonElement>('[data-menu-btn]');
+  const label = document.querySelector<HTMLElement>('[data-menu-label]');
+
+  if (header) {
+    const onScroll = () => header.classList.toggle('scrolled', window.scrollY > 24);
+    onScroll();
+    window.addEventListener('scroll', onScroll, { passive: true });
+  }
+
+  if (header && btn && label) {
+    const setOpen = (open: boolean) => {
+      header.classList.toggle('open', open);
+      btn.setAttribute('aria-expanded', String(open));
+      label.textContent = (open ? btn.dataset.labelClose : btn.dataset.labelOpen) ?? '';
+    };
+    btn.addEventListener('click', () => setOpen(!header.classList.contains('open')));
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') setOpen(false);
+    });
+    window.matchMedia('(min-width: 1000px)').addEventListener('change', () => setOpen(false));
+  }
+</script>
+
+<style>
+  .header {
+    position: sticky;
+    top: 0;
+    z-index: 50;
+    height: var(--header-h);
+    background: rgba(10, 15, 12, 0.85);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--line);
+    transition: background 0.3s, border-color 0.3s;
+  }
+
+  /* Sur l'accueil, l'en-tête est transparent par-dessus la grande photo. */
+  .header.overlay {
+    position: fixed;
+    left: 0;
+    right: 0;
+    background: transparent;
+    backdrop-filter: none;
+    border-color: transparent;
+  }
+
+  .header.overlay.scrolled,
+  .header.overlay.open {
+    background: rgba(10, 15, 12, 0.9);
+    backdrop-filter: blur(12px);
+    border-color: var(--line);
+  }
+
+  .bar {
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+  }
+
+  .logo {
+    display: inline-flex;
+    align-items: center;
+    gap: 12px;
+    text-decoration: none;
+  }
+
+  .logo-mark {
+    display: block;
+    width: 36px;
+    height: 36px;
+    border-radius: 9px;
+    object-fit: cover;
+  }
+
+  .logo-text {
+    font-family: var(--font-display);
+    font-size: 1.2rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    white-space: nowrap;
+  }
+
+  .nav ul {
+    display: flex;
+    gap: 6px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .nav a {
+    display: block;
+    padding: 8px 14px;
+    border-radius: 999px;
+    font-size: 0.92rem;
+    font-weight: 500;
+    color: var(--muted);
+    text-decoration: none;
+    transition: color 0.2s, background 0.2s;
+  }
+
+  .nav a:hover {
+    color: var(--text);
+  }
+
+  .nav a[aria-current='page'] {
+    color: var(--text);
+    background: var(--accent-soft);
+  }
+
+  .actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .menu-btn {
+    display: none;
+    width: 44px;
+    height: 44px;
+    border: 1px solid var(--line-strong);
+    border-radius: 50%;
+    background: transparent;
+    color: var(--text);
+    cursor: pointer;
+    place-items: center;
+  }
+
+  .bars {
+    display: grid;
+    gap: 6px;
+    width: 18px;
+  }
+
+  .bars span {
+    height: 1.5px;
+    background: currentColor;
+    transition: transform 0.25s;
+  }
+
+  .open .bars span:first-child {
+    transform: translateY(3.75px) rotate(45deg);
+  }
+
+  .open .bars span:last-child {
+    transform: translateY(-3.75px) rotate(-45deg);
+  }
+
+  @media (max-width: 999px) {
+    .menu-btn {
+      display: grid;
+    }
+
+    .nav {
+      position: fixed;
+      top: var(--header-h);
+      left: 0;
+      right: 0;
+      height: calc(100dvh - var(--header-h));
+      padding: 24px var(--gutter);
+      background: var(--bg);
+      visibility: hidden;
+      opacity: 0;
+      transform: translateY(-8px);
+      transition: opacity 0.25s, transform 0.25s, visibility 0.25s;
+    }
+
+    .open .nav {
+      visibility: visible;
+      opacity: 1;
+      transform: none;
+    }
+
+    .nav ul {
+      flex-direction: column;
+      gap: 0;
+    }
+
+    .nav a {
+      padding: 18px 0;
+      border-radius: 0;
+      border-bottom: 1px solid var(--line);
+      font-family: var(--font-display);
+      font-size: 2rem;
+      text-transform: uppercase;
+      color: var(--text);
+    }
+
+    .nav a[aria-current='page'] {
+      background: none;
+      color: var(--accent);
+    }
+  }
+
+  @media (max-width: 420px) {
+    .logo-text {
+      font-size: 1rem;
+    }
+  }
+
+  @media (max-width: 360px) {
+    .logo-text {
+      display: none;
+    }
+  }
+</style>

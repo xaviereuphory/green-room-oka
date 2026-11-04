@@ -1,0 +1,106 @@
+---
+// Indique en direct si le lieu est ouvert, selon l'heure de Montréal.
+import { site } from '../data/site';
+import { hoursLabel, type Lang } from '../i18n/ui';
+
+interface Props {
+  lang: Lang;
+}
+
+const { lang } = Astro.props;
+const labels =
+  lang === 'fr'
+    ? { open: 'Ouvert maintenant', closed: 'Fermé pour le moment' }
+    : { open: 'Open now', closed: 'Closed right now' };
+---
+
+<p
+  class="status"
+  data-open-status
+  data-open={site.hours.open}
+  data-close={site.hours.close}
+  data-label-open={labels.open}
+  data-label-closed={labels.closed}
+>
+  <span class="pulse" aria-hidden="true"></span>
+  <span data-status-text>{hoursLabel(lang)}</span>
+  <span class="hours" data-status-hours hidden>· {hoursLabel(lang)}</span>
+</p>
+
+<script>
+  const toMinutes = (t: string) => {
+    const [h, m] = t.split(':').map(Number);
+    return h * 60 + m;
+  };
+
+  document.querySelectorAll<HTMLElement>('[data-open-status]').forEach((el) => {
+    const parts = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'America/Toronto',
+      hour: '2-digit',
+      minute: '2-digit',
+      hourCycle: 'h23',
+    }).formatToParts(new Date());
+    const now = Number(parts.find((p) => p.type === 'hour')?.value) * 60 + Number(parts.find((p) => p.type === 'minute')?.value);
+
+    const open = toMinutes(el.dataset.open ?? '07:00');
+    let close = toMinutes(el.dataset.close ?? '00:00');
+    if (close <= open) close += 24 * 60; // fermeture à minuit ou après minuit
+
+    const isOpen = (now >= open && now < close) || (now + 24 * 60 >= open && now + 24 * 60 < close);
+
+    el.classList.add(isOpen ? 'is-open' : 'is-closed');
+    const text = el.querySelector('[data-status-text]');
+    if (text) text.textContent = (isOpen ? el.dataset.labelOpen : el.dataset.labelClosed) ?? '';
+    el.querySelector('[data-status-hours]')?.removeAttribute('hidden');
+  });
+</script>
+
+<style>
+  .status {
+    display: inline-flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px 10px;
+    font-weight: 500;
+  }
+
+  .pulse {
+    position: relative;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--muted);
+    flex: none;
+  }
+
+  .is-open .pulse {
+    background: var(--accent);
+  }
+
+  .is-open .pulse::after {
+    content: '';
+    position: absolute;
+    inset: -4px;
+    border-radius: 50%;
+    border: 1px solid var(--accent);
+    animation: ping 2s ease-out infinite;
+  }
+
+  .is-closed .pulse {
+    background: #d98a6a;
+  }
+
+  .hours {
+    color: var(--muted);
+    font-weight: 400;
+  }
+
+  .hours[hidden] {
+    display: none;
+  }
+
+  @keyframes ping {
+    from { transform: scale(0.6); opacity: 1; }
+    to { transform: scale(1.6); opacity: 0; }
+  }
+</style>

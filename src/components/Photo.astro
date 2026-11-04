@@ -1,0 +1,97 @@
+---
+// Emplacement photo en attendant les vraies photos du lieu.
+// Pour mettre une vraie photo : passer `src` (et `alt`), le bloc d'attente disparaît.
+interface Props {
+  label?: string;
+  caption: string;
+  tone?: number;
+  ratio?: string;
+  src?: string;
+  alt?: string;
+  class?: string;
+  eager?: boolean;
+}
+
+const { label, caption, tone = 0, ratio = '4 / 3', src, alt = '', class: className, eager = false } = Astro.props;
+const t = Math.abs(tone) % 6;
+---
+
+<figure class:list={['photo', `tone-${t}`, className]} style={`--ratio: ${ratio}`}>
+  {src ? (
+    <img src={src} alt={alt} loading={eager ? 'eager' : 'lazy'} decoding="async" />
+  ) : (
+    <figcaption>
+      <span class="dot" aria-hidden="true"></span>
+      {caption}{label && <span class="label"> · {label}</span>}
+    </figcaption>
+  )}
+</figure>
+
+<style>
+  .photo {
+    position: relative;
+    margin: 0;
+    aspect-ratio: var(--ratio);
+    border-radius: var(--radius);
+    overflow: hidden;
+    background-color: var(--surface);
+    isolation: isolate;
+  }
+
+  .photo img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  /* Fond d'attente : lumière tamisée verte et ambrée, avec du grain. */
+  .photo::before,
+  .photo::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+  }
+
+  .photo::after {
+    opacity: 0.22;
+    mix-blend-mode: overlay;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+
+  .tone-0::before { background: radial-gradient(120% 90% at 20% 15%, #2f6b45 0%, transparent 55%), radial-gradient(90% 80% at 85% 90%, #6b4a1f 0%, transparent 60%), #0e1511; }
+  .tone-1::before { background: radial-gradient(100% 80% at 80% 20%, #1f5a3a 0%, transparent 60%), radial-gradient(70% 60% at 15% 85%, #3a2a14 0%, transparent 65%), #0c120f; }
+  .tone-2::before { background: radial-gradient(90% 90% at 50% 0%, #7a5a26 0%, transparent 55%), radial-gradient(100% 70% at 50% 100%, #173a28 0%, transparent 70%), #100f0b; }
+  .tone-3::before { background: radial-gradient(80% 70% at 10% 50%, #285c3e 0%, transparent 60%), radial-gradient(60% 60% at 90% 30%, #4f2f2a 0%, transparent 65%), #0d1210; }
+  .tone-4::before { background: radial-gradient(110% 90% at 70% 70%, #2a7049 0%, transparent 55%), radial-gradient(60% 50% at 20% 15%, #5e4520 0%, transparent 70%), #0b100d; }
+  .tone-5::before { background: radial-gradient(90% 90% at 30% 80%, #6a3e1d 0%, transparent 55%), radial-gradient(90% 70% at 80% 10%, #1d4a33 0%, transparent 65%), #0f0d0a; }
+
+  figcaption {
+    position: absolute;
+    left: 14px;
+    bottom: 12px;
+    right: 14px;
+    display: block;
+    line-height: 1.4;
+    font-size: 0.72rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: rgba(236, 233, 225, 0.6);
+  }
+
+  .dot {
+    display: inline-block;
+    vertical-align: 1px;
+    margin-right: 8px;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--accent);
+    opacity: 0.8;
+    flex: none;
+  }
+
+  .label {
+    color: rgba(236, 233, 225, 0.85);
+  }
+</style>

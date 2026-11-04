@@ -1,0 +1,123 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import PageHead from '../PageHead.astro';
+import Photo from '../Photo.astro';
+import Todo from '../Todo.astro';
+import { routes, ui, type Lang } from '../../i18n/ui';
+
+interface Props {
+  lang: Lang;
+}
+
+const { lang } = Astro.props;
+const t = ui[lang];
+const a = t.about;
+---
+
+<BaseLayout lang={lang} page="about">
+  <PageHead eyebrow={a.eyebrow} title={a.title} intro={a.intro} />
+
+  <section class="section">
+    <div class="container stack">
+      <Photo caption={t.photo} label={lang === 'fr' ? 'le lieu' : 'the place'} tone={2} ratio="21 / 9" class="wide" />
+
+      <div class="split">
+        <h2>{a.storyTitle}</h2>
+        <Todo label={a.todoLabel}>{a.storyTodo}</Todo>
+      </div>
+
+      <div class="split reverse">
+        <div class="split-text">
+          <h2>{a.ambianceTitle}</h2>
+          <Todo label={a.todoLabel}>{a.ambianceTodo}</Todo>
+        </div>
+        <Photo caption={t.photo} label={lang === 'fr' ? 'en soirée' : 'at night'} tone={5} ratio="4 / 5" />
+      </div>
+
+      <div>
+        <h2 class="team-title">{a.teamTitle}</h2>
+        <ul class="team">
+          {[0, 1, 2].map((i) => (
+            <li>
+              <Photo caption={a.teamTodo} tone={i + 3} ratio="3 / 4" />
+            </li>
+          ))}
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section class="cta">
+    <div class="container cta-inner">
+      <h2>{t.home.ctaTitle}</h2>
+      <a class="btn btn-primary" href={routes.visit[lang]}>{t.home.ctaButton}</a>
+    </div>
+  </section>
+</BaseLayout>
+
+<style>
+  .stack {
+    display: grid;
+    gap: clamp(64px, 10vw, 120px);
+  }
+
+  .stack :global(.wide) {
+    margin-top: calc(-1 * clamp(24px, 4vw, 48px));
+  }
+
+  .split {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr);
+    gap: clamp(24px, 5vw, 64px);
+    align-items: start;
+  }
+
+  .split.reverse {
+    grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+    align-items: center;
+  }
+
+  .split-text {
+    display: grid;
+    gap: 28px;
+  }
+
+  .team-title {
+    margin-bottom: 32px;
+  }
+
+  .team {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .cta {
+    padding-block: clamp(72px, 10vw, 128px);
+    border-top: 1px solid var(--line);
+    background: radial-gradient(60% 80% at 50% 100%, rgba(111, 214, 143, 0.12), transparent 70%);
+    text-align: center;
+  }
+
+  .cta-inner {
+    display: grid;
+    justify-items: center;
+    gap: 24px;
+  }
+
+  @media (max-width: 760px) {
+    .split,
+    .split.reverse {
+      grid-template-columns: 1fr;
+    }
+    .team {
+      grid-template-columns: 1fr 1fr;
+    }
+    .team li:last-child {
+      display: none;
+    }
+  }
+</style>

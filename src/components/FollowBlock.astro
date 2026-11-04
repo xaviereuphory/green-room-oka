@@ -1,0 +1,41 @@
+---
+import { site } from '../data/site';
+import { ui, type Lang } from '../i18n/ui';
+
+interface Props {
+  lang: Lang;
+}
+
+const { lang } = Astro.props;
+const t = ui[lang].follow;
+const instagram = site.socials.find((s) => s.name === 'Instagram');
+---
+
+<section class="follow">
+  <div class="container inner">
+    <p>{t.text}</p>
+    {instagram && (
+      <a class="btn btn-ghost" href={instagram.href} target="_blank" rel="noopener">{t.button}</a>
+    )}
+  </div>
+</section>
+
+<style>
+  .follow {
+    border-top: 1px solid var(--line);
+    background: var(--surface);
+  }
+
+  .inner {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px 24px;
+    padding-block: 40px;
+  }
+
+  p {
+    font-size: 1.05rem;
+  }
+</style>

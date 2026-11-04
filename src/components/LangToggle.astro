@@ -1,0 +1,93 @@
+---
+import { routes, ui, type Lang, type PageKey } from '../i18n/ui';
+
+interface Props {
+  lang: Lang;
+  page: PageKey;
+}
+
+const { lang, page } = Astro.props;
+const options: { code: Lang; label: string; name: string }[] = [
+  { code: 'fr', label: 'FR', name: 'Français' },
+  { code: 'en', label: 'EN', name: 'English' },
+];
+---
+
+<nav class="lang" aria-label={ui[lang].langSwitch} data-active={lang}>
+  <span class="thumb" aria-hidden="true"></span>
+  {options.map((o) => (
+    <a
+      href={routes[page][o.code]}
+      hreflang={o.code}
+      lang={o.code}
+      aria-current={o.code === lang ? 'true' : undefined}
+      title={o.name}
+      data-lang-link={o.code}
+    >
+      {o.label}
+    </a>
+  ))}
+</nav>
+
+<script>
+  // Retient le choix de langue pour la prochaine visite.
+  document.querySelectorAll<HTMLAnchorElement>('[data-lang-link]').forEach((link) => {
+    link.addEventListener('click', () => {
+      try {
+        localStorage.setItem('gr-lang', link.dataset.langLink ?? 'fr');
+      } catch {}
+    });
+  });
+</script>
+
+<style>
+  .lang {
+    position: relative;
+    display: inline-grid;
+    grid-template-columns: 1fr 1fr;
+    padding: 3px;
+    border: 1px solid var(--line-strong);
+    border-radius: 999px;
+    background: rgba(10, 15, 12, 0.5);
+    font-size: 0.78rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+  }
+
+  .thumb {
+    position: absolute;
+    top: 3px;
+    bottom: 3px;
+    left: 3px;
+    width: calc(50% - 3px);
+    border-radius: 999px;
+    background: var(--accent);
+    transition: transform 0.25s ease;
+  }
+
+  .lang[data-active='en'] .thumb {
+    transform: translateX(100%);
+  }
+
+  a {
+    position: relative;
+    z-index: 1;
+    display: grid;
+    place-items: center;
+    min-width: 40px;
+    height: 32px;
+    padding: 0 10px;
+    border-radius: 999px;
+    color: var(--muted);
+    text-decoration: none;
+    transition: color 0.2s;
+  }
+
+  a:hover {
+    color: var(--text);
+  }
+
+  a[aria-current='true'] {
+    color: var(--accent-ink);
+  }
+</style>

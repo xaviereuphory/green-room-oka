@@ -1,0 +1,272 @@
+---
+import { withBase } from '../i18n/ui';
+// Scène 3D à effet de parallaxe : le logo flotte devant l'enseigne « STAY HIGH »,
+// elle-même devant un mur de « THE GREEN ROOM » (le motif du logo).
+// La souris incline la scène, le défilement décale les plans, et un léger balancement
+// tourne en continu (utile sur mobile, sans souris). Tout s'arrête si l'appareil
+// demande de réduire les animations.
+const words = ['STAY', 'HIGH'];
+const depth = 12; // nombre de couches qui donnent l'épaisseur aux lettres
+const rows = Array.from({ length: 22 }, (_, i) => i);
+const rowText = Array(10).fill('THE GREEN ROOM').join('   ');
+---
+
+<div class="scene" data-scene>
+  <div class="rig">
+    <div class="tilt">
+      <div class="sway">
+        <!-- Fond : le motif du logo -->
+        <div class="layer pattern" aria-hidden="true" style="--z: -420px; --speed: 160px">
+          {rows.map((i) => (
+            <div class="row" style={`--dir: ${i % 2 ? 1 : -1}`}><span>{rowText}</span></div>
+          ))}
+        </div>
+
+        <div class="layer glow" aria-hidden="true" style="--z: -200px; --speed: 90px"></div>
+
+        <!-- Le logo, au premier plan -->
+        <img
+          class="layer logo"
+          src={withBase('/logo.webp')}
+          width="400"
+          height="400"
+          alt="The Green Room"
+          style="--z: 150px; --speed: -40px"
+        />
+
+        <!-- L'enseigne -->
+        <div class="layer sign" style="--z: 0px; --speed: 0px">
+          <p class="slogan" role="img" aria-label="Stay high">
+            {words.map((w) => (
+              <span class="word" aria-hidden="true">
+                {Array.from({ length: depth }, (_, i) => (
+                  <span class="copy" style={`--i: ${i}`}>{w}</span>
+                ))}
+              </span>
+            ))}
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  const scene = document.querySelector<HTMLElement>('[data-scene]');
+
+  if (scene && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    const area = scene.closest<HTMLElement>('section') ?? scene;
+    let tx = 0, ty = 0, cx = 0, cy = 0, ts = 0, sp = 0; // cibles et valeurs lissées
+    let raf = 0;
+    let visible = true;
+
+    const clamp = (v: number) => Math.max(-1, Math.min(1, v));
+    const scrollRatio = () => Math.min(1, Math.max(0, window.scrollY / window.innerHeight));
+
+    const paint = () => {
+      cx += (tx - cx) * 0.08;
+      cy += (ty - cy) * 0.08;
+      sp += (ts - sp) * 0.12;
+      scene.style.setProperty('--ry', (cx * 14).toFixed(2) + 'deg');
+      scene.style.setProperty('--rx', (-cy * 9).toFixed(2) + 'deg');
+      scene.style.setProperty('--sp', sp.toFixed(4));
+      const settled = Math.abs(tx - cx) < 0.001 && Math.abs(ty - cy) < 0.001 && Math.abs(ts - sp) < 0.0005;
+      raf = !settled && visible ? requestAnimationFrame(paint) : 0;
+    };
+    const start = () => {
+      if (!raf) raf = requestAnimationFrame(paint);
+    };
+
+    area.addEventListener('pointermove', (e) => {
+      if (e.pointerType === 'touch') return;
+      const r = area.getBoundingClientRect();
+      tx = clamp(((e.clientX - r.left) / r.width - 0.5) * 2);
+      ty = clamp(((e.clientY - r.top) / r.height - 0.5) * 2);
+      start();
+    });
+    area.addEventListener('pointerleave', () => {
+      tx = 0;
+      ty = 0;
+      start();
+    });
+    window.addEventListener(
+      'scroll',
+      () => {
+        ts = scrollRatio();
+        start();
+      },
+      { passive: true },
+    );
+    new IntersectionObserver(([entry]) => {
+      visible = entry.isIntersecting;
+      if (visible) start();
+    }).observe(area);
+
+    ts = sp = scrollRatio();
+    paint();
+  }
+</script>
+
+<style>
+  .scene {
+    width: 100%;
+  }
+
+  .rig {
+    perspective: 1100px;
+    perspective-origin: 50% 45%;
+  }
+
+  .tilt {
+    transform-style: preserve-3d;
+    transform: rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg));
+    will-change: transform;
+  }
+
+  .sway {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: clamp(20px, 3.5vw, 40px);
+    transform-style: preserve-3d;
+    animation: sway 9s ease-in-out infinite alternate;
+  }
+
+  /* Chaque plan a une profondeur (--z) et une vitesse de défilement (--speed). */
+  .layer {
+    transform: translate3d(0, calc(var(--sp, 0) * var(--speed, 0px)), var(--z, 0px));
+  }
+
+  /* Mur de texte, comme sur le logo */
+  .pattern {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 220vw;
+    translate: -50% -50%;
+    pointer-events: none;
+    mask-image: radial-gradient(ellipse 45% 40% at 50% 50%, #000 0%, transparent 100%);
+    -webkit-mask-image: radial-gradient(ellipse 45% 40% at 50% 50%, #000 0%, transparent 100%);
+  }
+
+  .row {
+    display: flex;
+    justify-content: center;
+    white-space: nowrap;
+    font-family: var(--font-body);
+    font-weight: 300;
+    font-size: clamp(2rem, 4vw, 3.5rem);
+    line-height: 1.2;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    color: rgba(111, 214, 143, 0.1);
+    animation: drift 90s linear infinite alternate;
+    animation-direction: alternate;
+  }
+
+  .row[style*='--dir: -1'] {
+    animation-direction: alternate-reverse;
+  }
+
+  .glow {
+    position: absolute;
+    left: 50%;
+    top: 62%;
+    width: min(95vw, 1200px);
+    aspect-ratio: 2 / 1;
+    translate: -50% -50%;
+    background: radial-gradient(closest-side, rgba(132, 217, 43, 0.22), transparent);
+    filter: blur(24px);
+    pointer-events: none;
+  }
+
+  .logo {
+    position: relative;
+    display: block;
+    width: clamp(84px, 11vw, 128px);
+    height: auto;
+    border-radius: 22%;
+    box-shadow:
+      0 24px 60px rgba(0, 0, 0, 0.55),
+      0 0 0 1px rgba(255, 255, 255, 0.1);
+    animation: bob 5s ease-in-out infinite alternate;
+  }
+
+  /* L'enseigne : deux barres de métal derrière les lettres */
+  .sign {
+    position: relative;
+    transform-style: preserve-3d;
+    padding-block: clamp(14px, 2vw, 26px);
+  }
+
+  .sign::before,
+  .sign::after {
+    content: '';
+    position: absolute;
+    left: -8%;
+    right: -8%;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, rgba(236, 233, 225, 0.28), transparent);
+    transform: translateZ(-60px);
+  }
+
+  .sign::before {
+    top: 0;
+  }
+
+  .sign::after {
+    bottom: 0;
+  }
+
+  .slogan {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0 0.28em;
+    margin: 0;
+    font-family: var(--font-sign);
+    font-weight: 800;
+    font-size: clamp(3.6rem, 12vw, 9rem);
+    line-height: 0.95;
+    letter-spacing: -0.01em;
+    transform-style: preserve-3d;
+  }
+
+  .word {
+    display: grid;
+    transform-style: preserve-3d;
+  }
+
+  /* Les couches empilées créent l'épaisseur : plus on recule, plus le vert fonce. */
+  .copy {
+    grid-area: 1 / 1;
+    transform: translateZ(calc(var(--i) * -4px));
+    color: color-mix(in srgb, var(--lime) calc(100% - var(--i) * 6.5%), #04100a);
+  }
+
+  .copy:first-child {
+    text-shadow: 0 0 36px rgba(132, 217, 43, 0.35);
+  }
+
+  @media (max-width: 640px) {
+    .slogan {
+      font-size: 24vw;
+    }
+  }
+
+  @keyframes sway {
+    from { transform: rotateY(-3deg) rotateX(1.2deg); }
+    to { transform: rotateY(3deg) rotateX(-1.2deg); }
+  }
+
+  @keyframes bob {
+    from { translate: 0 0; }
+    to { translate: 0 -8px; }
+  }
+
+  @keyframes drift {
+    from { translate: -4% 0; }
+    to { translate: 4% 0; }
+  }
+</style>

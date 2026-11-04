@@ -1,0 +1,35 @@
+---
+// Bloc « contenu à venir » : montre clairement ce qui reste à écrire avec le client.
+interface Props {
+  label: string;
+}
+
+const { label } = Astro.props;
+---
+
+<div class="todo">
+  <p class="label">{label}</p>
+  <p class="text"><slot /></p>
+</div>
+
+<style>
+  .todo {
+    padding: 22px 24px;
+    border: 1px dashed var(--line-strong);
+    border-radius: var(--radius);
+    background: rgba(236, 233, 225, 0.02);
+  }
+
+  .label {
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 8px;
+  }
+
+  .text {
+    color: var(--muted);
+  }
+</style>

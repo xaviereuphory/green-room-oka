@@ -1,0 +1,108 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import PageHead from '../PageHead.astro';
+import FollowBlock from '../FollowBlock.astro';
+import SampleTag from '../SampleTag.astro';
+import Photo from '../Photo.astro';
+import { news } from '../../data/news';
+import { ui, venues, dateParts, type Lang } from '../../i18n/ui';
+
+interface Props {
+  lang: Lang;
+}
+
+const { lang } = Astro.props;
+const t = ui[lang];
+const sorted = [...news].sort((a, b) => b.date.localeCompare(a.date));
+const venueName = (id?: string) => venues.find((v) => v.id === id)?.name[lang];
+---
+
+<BaseLayout lang={lang} page="news">
+  <PageHead eyebrow={t.news.eyebrow} title={t.news.title} intro={t.news.intro} />
+
+  <section class="section">
+    <div class="container">
+      {sorted.length === 0 ? (
+        <p class="empty">{t.news.empty}</p>
+      ) : (
+        <ul class="grid">
+          {sorted.map((n, i) => {
+            const place = venueName(n.venue);
+            return (
+              <li>
+                <article class="card">
+                  <Photo caption={t.photo} tone={i + 2} ratio="16 / 10" />
+                  <div class="body">
+                    <p class="meta">
+                      <time datetime={n.date}>{dateParts(n.date, lang).long}</time>
+                      {place && <span> · {place}</span>}
+                    </p>
+                    <h2 class="title">{n.title[lang]}</h2>
+                    <p class="text">{n.text[lang]}</p>
+                    {n.sample && <div><SampleTag lang={lang} /></div>}
+                  </div>
+                </article>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </div>
+  </section>
+
+  <FollowBlock lang={lang} />
+</BaseLayout>
+
+<style>
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 20px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .card {
+    display: grid;
+    gap: 18px;
+    height: 100%;
+  }
+
+  .body {
+    display: grid;
+    gap: 10px;
+    align-content: start;
+  }
+
+  .meta {
+    font-size: 0.82rem;
+    color: var(--muted);
+  }
+
+  .title {
+    font-size: clamp(1.35rem, 2.2vw, 1.7rem);
+    line-height: 1.1;
+  }
+
+  .text {
+    color: var(--muted);
+  }
+
+  .empty {
+    color: var(--muted);
+  }
+
+  @media (max-width: 900px) {
+    .grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+
+  @media (max-width: 600px) {
+    .grid {
+      grid-template-columns: 1fr;
+      gap: 40px;
+    }
+  }
+</style>
