@@ -47,7 +47,7 @@ const year = new Date().getFullYear();
     </div>
 
     <div class="bottom">
-      <p>© {year} {site.name}. {t.footer.rights}</p>
+      <p>© {year} {site.name}. {t.footer.rights} <a href={routes.privacy[lang]}>{t.footer.privacy}</a></p>
       <p class="age">{t.footer.ageNote}</p>
     </div>
   </div>
@@ -142,6 +142,16 @@ const year = new Date().getFullYear();
 
   .age {
     color: var(--text);
+  }
+
+  .bottom a {
+    margin-left: 8px;
+    color: var(--text);
+    text-underline-offset: 3px;
+  }
+
+  .bottom a:hover {
+    color: var(--accent);
   }
 
   @media (max-width: 900px) {

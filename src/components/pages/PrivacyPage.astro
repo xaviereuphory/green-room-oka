@@ -1,0 +1,407 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import PageHead from '../PageHead.astro';
+import { site } from '../../data/site';
+import { dateParts, type Lang } from '../../i18n/ui';
+import { privacy, providers } from '../../i18n/privacy';
+
+interface Props {
+  lang: Lang;
+}
+
+const { lang } = Astro.props;
+const t = privacy[lang];
+const p = site.privacy;
+const updated = dateParts(p.updated, lang).long;
+const rows = providers(lang);
+const caiUrl = lang === 'fr' ? 'https://www.cai.gouv.qc.ca/' : 'https://www.cai.gouv.qc.ca/english/';
+---
+
+<BaseLayout lang={lang} page="privacy">
+  <PageHead eyebrow={t.eyebrow} title={t.title} intro={t.intro} />
+
+  <section class="section">
+    <div class="container layout">
+      <aside class="toc">
+        <nav aria-labelledby="toc-title">
+          <p id="toc-title" class="toc-title">{t.tocLabel}</p>
+          <ol>
+            {t.sections.map((s) => (
+              <li><a href={`#${s.id}`}>{s.title}</a></li>
+            ))}
+          </ol>
+        </nav>
+      </aside>
+
+      <article class="body">
+        <p class="updated">
+          {t.updatedLabel} : <time datetime={p.updated}>{updated}</time>
+        </p>
+
+        <div class="summary">
+          <h2 class="summary-title">{t.summaryTitle}</h2>
+          <ul>
+            {t.summary.map((line) => <li>{line}</li>)}
+          </ul>
+        </div>
+
+        {t.sections.map((s, i) => (
+          <section id={s.id} class="part" aria-labelledby={`${s.id}-title`}>
+            <h2 id={`${s.id}-title`}>
+              <span class="num" aria-hidden="true">{String(i + 1).padStart(2, '0')}</span>
+              {s.title}
+            </h2>
+
+            {s.blocks.map((b) => {
+              if (b.kind === 'p') return <p>{b.text}</p>;
+              if (b.kind === 'h3') return <h3>{b.text}</h3>;
+              if (b.kind === 'ul') return <ul class="list">{b.items.map((item) => <li>{item}</li>)}</ul>;
+
+              if (b.kind === 'officer')
+                return (
+                  <div class="card">
+                    <p class="card-label">{t.officerTitle}</p>
+                    {p.officer.name && p.email ? (
+                      <>
+                        <p class="card-name">{p.officer.name}, {p.officer.title[lang]}</p>
+                        <p><a href={`mailto:${p.email}`}>{p.email}</a></p>
+                      </>
+                    ) : (
+                      <p class="todo"><span class="todo-tag">{t.todoLabel}</span> {t.officerTodo}</p>
+                    )}
+                    <p class="muted">{site.name} · {site.address.street}, {site.address.city}, {site.address.region} {site.address.postalCode}</p>
+                  </div>
+                );
+
+              if (b.kind === 'providers')
+                return (
+                  <div class="table-wrap">
+                    <table>
+                      <thead>
+                        <tr>
+                          <th scope="col">{t.providersHead.name}</th>
+                          <th scope="col">{t.providersHead.role}</th>
+                          <th scope="col">{t.providersHead.where}</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {rows.map((r) => (
+                          <tr>
+                            <th scope="row">{r.name ?? <span class="todo-tag">{t.providersTodo}</span>}</th>
+                            <td>{r.role}</td>
+                            <td>{r.where ?? <span class="todo-tag">{t.providersTodo}</span>}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                );
+
+              if (b.kind === 'cai')
+                return (
+                  <p>
+                    {t.caiText} <a href={caiUrl} target="_blank" rel="noopener">{t.caiLink}</a>.
+                  </p>
+                );
+            })}
+          </section>
+        ))}
+      </article>
+    </div>
+  </section>
+</BaseLayout>
+
+<style>
+  .layout {
+    display: grid;
+    grid-template-columns: 240px minmax(0, 1fr);
+    gap: clamp(32px, 6vw, 96px);
+    align-items: start;
+  }
+
+  /* Table des matières */
+  .toc {
+    position: sticky;
+    top: calc(var(--header-h) + 24px);
+  }
+
+  .toc-title {
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 14px;
+  }
+
+  .toc ol {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    display: grid;
+    gap: 2px;
+    border-left: 1px solid var(--line);
+  }
+
+  .toc a {
+    display: block;
+    padding: 6px 0 6px 16px;
+    margin-left: -1px;
+    border-left: 1px solid transparent;
+    color: var(--muted);
+    text-decoration: none;
+    font-size: 0.92rem;
+    line-height: 1.4;
+  }
+
+  .toc a:hover {
+    color: var(--text);
+    border-left-color: var(--accent);
+  }
+
+  /* Contenu */
+  .body {
+    max-width: 68ch;
+    display: grid;
+    gap: 56px;
+  }
+
+  .updated {
+    color: var(--muted);
+    font-size: 0.9rem;
+  }
+
+  .summary {
+    padding: 28px;
+    border: 1px solid var(--line-strong);
+    border-radius: var(--radius);
+    background: var(--accent-soft);
+    margin-top: -32px;
+  }
+
+  .summary-title {
+    font-family: var(--font-body);
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.16em;
+    color: var(--accent);
+    margin-bottom: 16px;
+  }
+
+  .summary ul {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    display: grid;
+    gap: 10px;
+  }
+
+  .summary li {
+    position: relative;
+    padding-left: 26px;
+  }
+
+  .summary li::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0.55em;
+    width: 12px;
+    height: 6px;
+    border-left: 2px solid var(--accent);
+    border-bottom: 2px solid var(--accent);
+    transform: rotate(-45deg);
+  }
+
+  .part {
+    display: grid;
+    gap: 16px;
+    scroll-margin-top: calc(var(--header-h) + 24px);
+  }
+
+  .part h2 {
+    font-size: clamp(1.7rem, 3.6vw, 2.4rem);
+    display: flex;
+    align-items: baseline;
+    gap: 14px;
+    margin-bottom: 4px;
+  }
+
+  .num {
+    font-family: var(--font-body);
+    font-size: 0.8rem;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    color: var(--accent);
+  }
+
+  .part h3 {
+    font-family: var(--font-body);
+    text-transform: none;
+    letter-spacing: 0;
+    font-size: 1.05rem;
+    font-weight: 600;
+    margin-top: 12px;
+  }
+
+  .part p,
+  .part li {
+    color: rgba(236, 233, 225, 0.86);
+  }
+
+  .part a {
+    color: var(--accent);
+    text-underline-offset: 3px;
+  }
+
+  .list {
+    margin: 0;
+    padding-left: 1.2em;
+    display: grid;
+    gap: 8px;
+  }
+
+  .list li::marker {
+    color: var(--accent);
+  }
+
+  .card {
+    display: grid;
+    gap: 6px;
+    padding: 22px 24px;
+    border: 1px solid var(--line-strong);
+    border-radius: var(--radius);
+    background: var(--surface);
+  }
+
+  .card-label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--accent);
+  }
+
+  .card-name {
+    font-weight: 600;
+  }
+
+  .muted,
+  .part .muted {
+    color: var(--muted);
+    font-size: 0.9rem;
+  }
+
+  .todo-tag {
+    display: inline-block;
+    padding: 1px 8px;
+    border: 1px dashed var(--line-strong);
+    border-radius: 999px;
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--accent);
+    white-space: nowrap;
+  }
+
+  .part .todo {
+    color: var(--muted);
+  }
+
+  .table-wrap {
+    overflow-x: auto;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.93rem;
+  }
+
+  th,
+  td {
+    text-align: left;
+    vertical-align: top;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--line);
+  }
+
+  tbody tr:last-child th,
+  tbody tr:last-child td {
+    border-bottom: 0;
+  }
+
+  thead th {
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--muted);
+    background: var(--surface);
+  }
+
+  tbody th {
+    font-weight: 600;
+    white-space: nowrap;
+  }
+
+  td {
+    color: rgba(236, 233, 225, 0.86);
+  }
+
+  @media (max-width: 900px) {
+    .layout {
+      grid-template-columns: 1fr;
+    }
+
+    .toc {
+      position: static;
+      padding: 20px 24px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+    }
+  }
+
+  @media (max-width: 560px) {
+    /* Sur téléphone, le tableau devient une liste de fiches. */
+    table,
+    thead,
+    tbody,
+    tr,
+    th,
+    td {
+      display: block;
+    }
+
+    thead {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip: rect(0 0 0 0);
+    }
+
+    tbody tr {
+      padding: 14px 16px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    tbody tr:last-child {
+      border-bottom: 0;
+    }
+
+    th,
+    td {
+      padding: 2px 0;
+      border: 0;
+    }
+
+    td:last-child {
+      color: var(--muted);
+      font-size: 0.85rem;
+    }
+  }
+</style>

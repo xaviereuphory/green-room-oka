@@ -1,0 +1,337 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import PageHead from '../PageHead.astro';
+import { shopText } from '../../i18n/shop';
+import type { Lang } from '../../i18n/ui';
+import { isLive } from '../../lib/shopApi';
+
+interface Props {
+  lang: Lang;
+}
+
+const { lang } = Astro.props;
+const t = shopText[lang];
+const config = { lang, t };
+---
+
+<BaseLayout lang={lang} page="staff">
+  <PageHead eyebrow={t.staff.eyebrow} title={t.staff.title} intro={isLive ? t.staff.introLive : t.staff.intro} />
+
+  <section class="section">
+    <div class="container staff" data-staff data-config={JSON.stringify(config)}>
+      <p class="sr-live" role="status" aria-live="polite" data-live></p>
+
+      <form class="login" data-login novalidate hidden>
+        <h2>{t.staff.login.title}</h2>
+        <label for="staff-email">{t.staff.login.email}</label>
+        <input id="staff-email" name="email" type="email" autocomplete="username" />
+        <label for="staff-pass">{t.staff.login.password}</label>
+        <input id="staff-pass" name="password" type="password" autocomplete="current-password" />
+        <p class="err" role="alert" data-err></p>
+        <button class="btn btn-primary" type="submit">{t.staff.login.button}</button>
+      </form>
+
+      <div data-panel hidden>
+        <div class="board" data-board></div>
+        <p class="clear-wrap">
+          {!isLive && <button type="button" class="link" data-clear>{t.staff.clear}</button>}
+          {isLive && <button type="button" class="link" data-logout>{t.staff.login.out}</button>}
+        </p>
+      </div>
+    </div>
+  </section>
+</BaseLayout>
+
+<script>
+  import { esc } from '../../lib/shopStore';
+  import type { Status } from '../../lib/shopStore';
+  import { createStaffApi } from '../../lib/shopApi';
+  import type { OrderView } from '../../lib/shopApi';
+
+  const root = document.querySelector<HTMLElement>('[data-staff]')!;
+  const cfg = JSON.parse(root.dataset.config!);
+  const t = cfg.t;
+  const api = createStaffApi(cfg.lang);
+  const board = root.querySelector<HTMLElement>('[data-board]')!;
+  const panel = root.querySelector<HTMLElement>('[data-panel]')!;
+  const login = root.querySelector<HTMLFormElement>('[data-login]')!;
+  const live = root.querySelector<HTMLElement>('[data-live]')!;
+  const fmt = new Intl.DateTimeFormat(cfg.lang === 'fr' ? 'fr-CA' : 'en-CA', { timeStyle: 'short', dateStyle: 'short', timeZone: 'America/Toronto' });
+
+  const next: Partial<Record<Status, Status>> = { new: 'preparing', preparing: 'ready', ready: 'pickedup' };
+  let known: Set<string> | null = null;
+  let orders: OrderView[] = [];
+
+  // Nombre de commandes (non annulées) par client : sert à repérer les habitués.
+  let totals = new Map<string, number>();
+
+  function ticket(o: OrderView) {
+    const adv = next[o.status];
+    const items = o.items.map((i) => `<li><strong>${i.qty} ×</strong> ${esc(i.name)} <span class="format">${esc(i.format)}</span></li>`).join('');
+    // Client qui a supprimé son compte : commande gardée sans nom.
+    const gone = !o.customerId;
+    const n = gone ? 0 : totals.get(o.customerId) ?? 1;
+    const history = gone ? '' : n > 1 ? t.staff.orderCount.replace('{n}', String(n)) : t.staff.firstOrder;
+    const who = gone ? t.staff.deletedCustomer : `${esc(o.first)} ${esc(o.last)} · ${esc(o.email)}`;
+    return `<article class="ticket s-border-${o.status}" data-id="${esc(o.id)}">
+      <div class="order-head"><strong>${esc(o.number)}</strong><span class="status s-${o.status}">${t.statuses[o.status]}</span></div>
+      <p class="format">${t.staff.customer} : ${who}</p>
+      ${history ? `<p class="format">${history}</p>` : ''}
+      <p class="format">${fmt.format(new Date(o.createdAt))}</p>
+      <ul class="items">${items}</ul>
+      ${o.note ? `<p class="staff-note">${esc(o.note)}</p>` : ''}
+      <div class="row">
+        ${adv ? `<button type="button" class="btn btn-primary" data-adv>${t.staff.advance[o.status as 'new' | 'preparing' | 'ready']}</button>` : ''}
+        ${o.status === 'new' || o.status === 'preparing' ? `<button type="button" class="link" data-cancel>${t.staff.cancel}</button>` : ''}
+      </div>
+    </article>`;
+  }
+
+  function draw() {
+    totals = new Map();
+    orders.forEach((o) => o.status !== 'cancelled' && o.customerId && totals.set(o.customerId, (totals.get(o.customerId) ?? 0) + 1));
+    const active = orders.filter((o) => ['new', 'preparing', 'ready'].includes(o.status)).reverse();
+    const done = orders.filter((o) => ['pickedup', 'cancelled'].includes(o.status));
+    const col = (title: string, list: OrderView[]) =>
+      `<section><h2>${title} <span class="count">${list.length}</span></h2>${list.length ? list.map(ticket).join('') : `<p class="empty">${t.staff.empty}</p>`}</section>`;
+    board.innerHTML = col(t.staff.col.active, active) + col(t.staff.col.done, done);
+  }
+
+  function beep() {
+    try {
+      const ctx = new AudioContext();
+      const osc = ctx.createOscillator();
+      osc.frequency.value = 880;
+      osc.connect(ctx.destination);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.15);
+    } catch {
+      /* son non disponible */
+    }
+  }
+
+  async function load() {
+    try {
+      orders = await api.listOrders();
+    } catch {
+      return;
+    }
+    draw();
+    const ids = new Set(orders.map((o) => o.id));
+    if (known) {
+      const fresh = orders.filter((o) => !known!.has(o.id) && o.status === 'new');
+      if (fresh.length) {
+        live.textContent = `${t.staff.fresh} : ${fresh.map((o) => o.number).join(', ')}`;
+        beep();
+      }
+    }
+    known = ids;
+  }
+
+  let started = false;
+  async function show(signedIn: boolean) {
+    login.hidden = signedIn;
+    panel.hidden = !signedIn;
+    if (!signedIn) return;
+    await load();
+    if (!started) {
+      started = true;
+      api.onChange(load);
+    }
+  }
+
+  login.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const err = login.querySelector<HTMLElement>('[data-err]')!;
+    err.textContent = '';
+    const ok = await api.signIn(login.email.value.trim(), login.password.value);
+    login.password.value = '';
+    if (ok) await show(true);
+    else err.textContent = t.staff.login.bad;
+  });
+
+  root.querySelector('[data-logout]')?.addEventListener('click', async () => {
+    await api.signOut();
+    known = null;
+    await show(false);
+  });
+
+  board.addEventListener('click', async (e) => {
+    const target = e.target as HTMLElement;
+    const el = target.closest<HTMLElement>('[data-id]');
+    const o = orders.find((x) => x.id === el?.dataset.id);
+    if (!el || !o) return;
+    let to: Status | undefined;
+    if (target.closest('[data-adv]')) to = next[o.status];
+    else if (target.closest('[data-cancel]')) to = 'cancelled';
+    if (!to) return;
+    try {
+      await api.setStatus(o.id, to);
+    } catch {
+      /* transition refusée : la liste est rechargée */
+    }
+    await load();
+  });
+
+  root.querySelector('[data-clear]')?.addEventListener('click', async () => {
+    if (!confirm(t.staff.confirmClear)) return;
+    api.clearDemo?.();
+    await load();
+  });
+
+  api.isSignedIn().then(show).catch(() => show(false));
+</script>
+
+<style is:global>
+  .staff .board {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 340px), 1fr));
+    gap: clamp(24px, 4vw, 48px);
+    align-items: start;
+  }
+
+  .staff h2 {
+    margin: 0 0 16px;
+    font-size: 1.6rem;
+  }
+
+  .staff .count {
+    margin-left: 6px;
+    font-family: var(--font-body);
+    font-size: 0.9rem;
+    color: var(--muted);
+  }
+
+  .ticket {
+    margin-bottom: 14px;
+    padding: 18px 20px;
+    border: 1px solid var(--line);
+    border-left-width: 4px;
+    border-radius: var(--radius);
+    background: var(--surface);
+  }
+
+  .ticket .items {
+    margin: 12px 0;
+    padding: 0;
+    list-style: none;
+    display: grid;
+    gap: 4px;
+  }
+
+  .ticket .format {
+    margin: 4px 0 0;
+    font-size: 0.85rem;
+    color: var(--muted);
+  }
+
+  .ticket .order-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .ticket .row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px;
+    margin-top: 14px;
+  }
+
+  .s-border-new { border-left-color: #c9a64a; }
+  .s-border-preparing { border-left-color: #5a8fd1; }
+  .s-border-ready { border-left-color: var(--accent); }
+  .s-border-pickedup, .s-border-cancelled { border-left-color: var(--line-strong); }
+
+  .staff-note {
+    margin: 0;
+    padding: 8px 12px;
+    border-radius: 8px;
+    background: rgba(201, 166, 74, 0.12);
+    color: #e3c772;
+    font-size: 0.9rem;
+  }
+
+  .staff .status {
+    padding: 4px 12px;
+    border-radius: 999px;
+    border: 1px solid var(--line-strong);
+    font-size: 0.78rem;
+    font-weight: 600;
+  }
+
+  .staff .s-new { color: #e3c772; border-color: #c9a64a; }
+  .staff .s-preparing { color: #8fc2ff; border-color: #5a8fd1; }
+  .staff .s-ready { color: var(--accent-ink); background: var(--accent); border-color: var(--accent); }
+  .staff .s-pickedup, .staff .s-cancelled { color: var(--muted); }
+
+  .staff .link {
+    padding: 4px;
+    border: 0;
+    background: none;
+    color: var(--muted);
+    font: inherit;
+    font-size: 0.85rem;
+    text-decoration: underline;
+    cursor: pointer;
+  }
+
+  .staff .empty {
+    color: var(--muted);
+  }
+
+  .staff .sr-live {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+
+  .clear-wrap {
+    margin-top: 40px;
+  }
+
+  .login {
+    display: grid;
+    max-width: 420px;
+    margin-inline: auto;
+    padding: clamp(22px, 4vw, 36px);
+    border: 1px solid var(--line);
+    border-radius: calc(var(--radius) + 6px);
+    background: var(--surface);
+  }
+
+  .login[hidden],
+  .staff [data-panel][hidden] {
+    display: none;
+  }
+
+  .login label {
+    margin: 16px 0 6px;
+    font-size: 0.88rem;
+    font-weight: 500;
+  }
+
+  .login input {
+    width: 100%;
+    padding: 14px 16px;
+    border: 1px solid var(--line-strong);
+    border-radius: var(--radius);
+    background: var(--bg);
+    color: var(--text);
+    font: inherit;
+  }
+
+  .login .err {
+    min-height: 1.2em;
+    margin: 8px 0 0;
+    color: #f08a7e;
+    font-size: 0.88rem;
+  }
+
+  .login .btn {
+    margin-top: 10px;
+  }
+</style>

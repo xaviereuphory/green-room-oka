@@ -1,0 +1,10 @@
+// Déploiement sur Cloudflare (Workers, fichiers statiques).
+// Cloudflare construit le site avec `npm run build`, puis publie le dossier dist/.
+{
+  "name": "green-room-oka",
+  "compatibility_date": "2026-11-01",
+  "assets": {
+    "directory": "./dist/",
+    "not_found_handling": "404-page"
+  }
+}

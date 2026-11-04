@@ -1,0 +1,314 @@
+---
+// Bouton « Supprimer mon compte » (Loi 25 : droit à l'effacement).
+// À placer dans la vue « Mes commandes » de la boutique (client connecté).
+//
+// Le composant ne parle pas à Supabase directement : il envoie l'événement
+// `gr:delete-account` et ShopPage.astro répond avec `api.deleteAccount()`
+// (l'écouteur doit appeler e.preventDefault()).
+import type { Lang } from '../i18n/ui';
+
+interface Props {
+  lang: Lang;
+}
+
+const { lang } = Astro.props;
+
+const text = {
+  fr: {
+    title: 'Supprimer mon compte',
+    intro: 'Votre compte, votre nom et votre courriel seront effacés. Vos commandes nouvelles seront annulées. Cette action est définitive.',
+    open: 'Supprimer mon compte',
+    dialogTitle: 'Supprimer votre compte ?',
+    list: [
+      'Votre nom, votre courriel et votre mot de passe sont effacés.',
+      'Vos commandes « nouvelles » sont annulées.',
+      'Votre historique est gardé par le commerce, sans votre nom.',
+    ],
+    word: 'SUPPRIMER',
+    confirmLabel: 'Pour confirmer, écrivez SUPPRIMER',
+    cancel: 'Garder mon compte',
+    confirm: 'Supprimer définitivement',
+    working: 'Suppression…',
+    done: 'Votre compte a été supprimé. Merci de votre visite.',
+    errors: {
+      orders_in_progress: 'Une de vos commandes est en préparation ou prête. Ramassez-la ou appelez-nous, puis réessayez.',
+      staff_account: 'Un compte employé ne peut pas être supprimé ici. Parlez au propriétaire.',
+      generic: 'La suppression n’a pas fonctionné. Réessayez dans un moment ou écrivez-nous.',
+    },
+  },
+  en: {
+    title: 'Delete my account',
+    intro: 'Your account, name and email will be erased. Your new orders will be cancelled. This cannot be undone.',
+    open: 'Delete my account',
+    dialogTitle: 'Delete your account?',
+    list: [
+      'Your name, email and password are erased.',
+      'Your “new” orders are cancelled.',
+      'The business keeps your order history, without your name.',
+    ],
+    word: 'DELETE',
+    confirmLabel: 'To confirm, type DELETE',
+    cancel: 'Keep my account',
+    confirm: 'Delete permanently',
+    working: 'Deleting…',
+    done: 'Your account has been deleted. Thanks for stopping by.',
+    errors: {
+      orders_in_progress: 'One of your orders is being prepared or is ready. Pick it up or call us, then try again.',
+      staff_account: 'A staff account can’t be deleted here. Talk to the owner.',
+      generic: 'Deletion didn’t work. Try again in a moment or write to us.',
+    },
+  },
+}[lang];
+---
+
+<section class="del" data-delete-account data-word={text.word} data-errors={JSON.stringify(text.errors)} data-working={text.working}>
+  <h2 class="del-title">{text.title}</h2>
+  <p class="del-intro">{text.intro}</p>
+  <button type="button" class="del-open" data-del-open>{text.open}</button>
+  <p class="del-done" role="status" hidden data-del-done>{text.done}</p>
+
+  <dialog class="del-dialog" aria-labelledby="del-dialog-title" data-del-dialog>
+    <form method="dialog" class="del-form" data-del-form>
+      <h2 id="del-dialog-title" class="del-dialog-title">{text.dialogTitle}</h2>
+      <ul class="del-list">
+        {text.list.map((line) => <li>{line}</li>)}
+      </ul>
+
+      <label class="del-label" for="del-word">{text.confirmLabel}</label>
+      <input
+        id="del-word"
+        class="del-input"
+        type="text"
+        autocomplete="off"
+        autocapitalize="characters"
+        spellcheck="false"
+        data-del-input
+      />
+
+      <p class="del-error" role="alert" hidden data-del-error></p>
+
+      <div class="del-actions">
+        <button type="button" class="btn btn-ghost" data-del-cancel>{text.cancel}</button>
+        <button type="submit" class="btn del-confirm" disabled data-del-confirm>{text.confirm}</button>
+      </div>
+    </form>
+  </dialog>
+</section>
+
+<script>
+  type DeleteDetail = { resolve: () => void; reject: (err: unknown) => void };
+
+  document.querySelectorAll<HTMLElement>('[data-delete-account]').forEach((root) => {
+    const word = root.dataset.word ?? '';
+    const errors = JSON.parse(root.dataset.errors ?? '{}') as Record<string, string>;
+    const dialog = root.querySelector<HTMLDialogElement>('[data-del-dialog]')!;
+    const form = root.querySelector<HTMLFormElement>('[data-del-form]')!;
+    const input = root.querySelector<HTMLInputElement>('[data-del-input]')!;
+    const confirmBtn = root.querySelector<HTMLButtonElement>('[data-del-confirm]')!;
+    const errorEl = root.querySelector<HTMLElement>('[data-del-error]')!;
+    const openBtn = root.querySelector<HTMLButtonElement>('[data-del-open]')!;
+    const doneEl = root.querySelector<HTMLElement>('[data-del-done]')!;
+    const confirmLabel = confirmBtn.textContent ?? '';
+    let busy = false;
+
+    const matches = () => input.value.trim().toUpperCase() === word;
+    const reset = () => {
+      input.value = '';
+      errorEl.hidden = true;
+      confirmBtn.disabled = true;
+      confirmBtn.textContent = confirmLabel;
+    };
+
+    openBtn.addEventListener('click', () => {
+      reset();
+      dialog.showModal();
+      input.focus();
+    });
+
+    root.querySelector('[data-del-cancel]')!.addEventListener('click', () => {
+      if (!busy) dialog.close();
+    });
+
+    // Échap pendant la suppression : on ne ferme pas.
+    dialog.addEventListener('cancel', (e) => {
+      if (busy) e.preventDefault();
+    });
+
+    input.addEventListener('input', () => {
+      confirmBtn.disabled = !matches();
+      errorEl.hidden = true;
+    });
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      if (!matches() || busy) return;
+
+      busy = true;
+      confirmBtn.disabled = true;
+      input.disabled = true;
+      confirmBtn.textContent = root.dataset.working ?? '…';
+
+      try {
+        await new Promise<void>((resolve, reject) => {
+          const handled = !document.dispatchEvent(
+            new CustomEvent<DeleteDetail>('gr:delete-account', { detail: { resolve, reject }, cancelable: true }),
+          );
+          // Personne n'écoute : la page boutique n'est pas branchée.
+          if (!handled) reject(new Error('generic'));
+        });
+
+        dialog.close();
+        openBtn.hidden = true;
+        doneEl.hidden = false;
+        root.dispatchEvent(new CustomEvent('gr:account-deleted', { bubbles: true }));
+      } catch (err) {
+        const code = err instanceof Error ? err.message : 'generic';
+        errorEl.textContent = errors[code] ?? errors.generic;
+        errorEl.hidden = false;
+        confirmBtn.textContent = confirmLabel;
+        confirmBtn.disabled = !matches();
+      } finally {
+        busy = false;
+        input.disabled = false;
+      }
+    });
+  });
+</script>
+
+<style>
+  .del {
+    display: grid;
+    gap: 12px;
+    justify-items: start;
+    padding-top: 32px;
+    margin-top: 32px;
+    border-top: 1px solid var(--line);
+  }
+
+  .del-title {
+    font-family: var(--font-body);
+    text-transform: none;
+    letter-spacing: 0;
+    font-size: 1.05rem;
+    font-weight: 600;
+  }
+
+  .del-intro {
+    color: var(--muted);
+    font-size: 0.93rem;
+    max-width: 56ch;
+  }
+
+  /* Lien discret plutôt qu'un gros bouton rouge : action rare et définitive. */
+  .del-open {
+    padding: 0;
+    border: 0;
+    background: none;
+    font: inherit;
+    font-size: 0.93rem;
+    font-weight: 600;
+    color: #f08a7e;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    cursor: pointer;
+  }
+
+  .del-open:hover {
+    color: #ffb3aa;
+  }
+
+  .del-done {
+    color: var(--accent);
+    font-weight: 600;
+  }
+
+  .del-dialog {
+    width: min(480px, calc(100vw - 32px));
+    padding: 0;
+    border: 1px solid var(--line-strong);
+    border-radius: var(--radius);
+    background: var(--surface);
+    color: var(--text);
+  }
+
+  .del-dialog::backdrop {
+    background: rgba(5, 8, 6, 0.75);
+    backdrop-filter: blur(4px);
+  }
+
+  .del-form {
+    display: grid;
+    gap: 16px;
+    padding: 28px;
+  }
+
+  .del-dialog-title {
+    font-size: clamp(1.6rem, 5vw, 2rem);
+  }
+
+  .del-list {
+    margin: 0;
+    padding-left: 1.2em;
+    display: grid;
+    gap: 6px;
+    color: rgba(236, 233, 225, 0.86);
+    font-size: 0.95rem;
+  }
+
+  .del-label {
+    font-size: 0.9rem;
+    font-weight: 600;
+  }
+
+  .del-input {
+    min-height: 48px;
+    padding: 0 14px;
+    border: 1px solid var(--line-strong);
+    border-radius: 10px;
+    background: var(--bg);
+    color: var(--text);
+    font: inherit;
+    letter-spacing: 0.08em;
+  }
+
+  .del-input:focus {
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
+  }
+
+  .del-error {
+    padding: 12px 14px;
+    border-radius: 10px;
+    background: rgba(240, 138, 126, 0.12);
+    color: #ffb3aa;
+    font-size: 0.92rem;
+  }
+
+  .del-actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 4px;
+  }
+
+  .del-confirm {
+    background: #e2574a;
+    color: #fff;
+  }
+
+  .del-confirm:hover:not(:disabled) {
+    background: #ef6b5e;
+  }
+
+  .del-confirm:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
+
+  @media (max-width: 480px) {
+    .del-actions .btn {
+      flex: 1 1 100%;
+    }
+  }
+</style>

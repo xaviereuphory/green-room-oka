@@ -1,5 +1,6 @@
 ---
 import LangToggle from './LangToggle.astro';
+import { site } from '../data/site';
 import { routes, ui, withBase, type Lang, type PageKey } from '../i18n/ui';
 
 interface Props {
@@ -15,6 +16,7 @@ const links: { key: PageKey; label: string }[] = [
   { key: 'about', label: t.about },
   { key: 'news', label: t.news },
   { key: 'events', label: t.events },
+  ...(site.shop.enabled ? [{ key: 'shop' as PageKey, label: t.shop }] : []),
   { key: 'visit', label: t.visit },
 ];
 ---
@@ -75,7 +77,7 @@ const links: { key: PageKey; label: string }[] = [
     document.addEventListener('keydown', (e) => {
       if (e.key === 'Escape') setOpen(false);
     });
-    window.matchMedia('(min-width: 1000px)').addEventListener('change', () => setOpen(false));
+    window.matchMedia('(min-width: 1100px)').addEventListener('change', () => setOpen(false));
   }
 </script>
 
@@ -141,7 +143,7 @@ const links: { key: PageKey; label: string }[] = [
 
   .nav ul {
     display: flex;
-    gap: 6px;
+    gap: 2px;
     margin: 0;
     padding: 0;
     list-style: none;
@@ -149,7 +151,8 @@ const links: { key: PageKey; label: string }[] = [
 
   .nav a {
     display: block;
-    padding: 8px 14px;
+    white-space: nowrap;
+    padding: 8px 12px;
     border-radius: 999px;
     font-size: 0.92rem;
     font-weight: 500;
@@ -205,7 +208,7 @@ const links: { key: PageKey; label: string }[] = [
     transform: translateY(-3.75px) rotate(-45deg);
   }
 
-  @media (max-width: 999px) {
+  @media (max-width: 1099px) {
     .menu-btn {
       display: grid;
     }

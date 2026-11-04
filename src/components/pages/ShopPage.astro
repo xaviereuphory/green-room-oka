@@ -1,0 +1,1176 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import PageHead from '../PageHead.astro';
+import { site } from '../../data/site';
+import { categories, products } from '../../data/shop';
+import { shopText } from '../../i18n/shop';
+import { hoursLabel, type Lang } from '../../i18n/ui';
+import { isLive } from '../../lib/shopApi';
+import DeleteAccount from '../DeleteAccount.astro';
+
+interface Props {
+  lang: Lang;
+}
+
+const { lang } = Astro.props;
+const t = shopText[lang];
+const g = t.gate;
+
+// Données passées au script : tout est déjà traduit.
+const config = {
+  lang,
+  t,
+  hours: hoursLabel(lang),
+  showPrices: site.shop.showPrices,
+  live: isLive,
+  categories: categories.map((c) => ({ id: c.id, name: c.name[lang] })),
+  products: products.map((p) => ({
+    id: p.id,
+    category: p.category,
+    name: p.name[lang],
+    format: p.format[lang],
+    price: p.price,
+    stock: p.stock,
+    tags: (p.tags ?? []).map((x) => x[lang]),
+  })),
+};
+---
+
+<BaseLayout lang={lang} page="shop">
+  <PageHead eyebrow={t.eyebrow} title={t.title} intro={t.intro} />
+
+  <section class="section">
+    <div class="container shop" data-shop data-config={JSON.stringify(config)}>
+      {!isLive && <p class="shop-demo">{t.demo}</p>}
+
+      <!-- 1. Compte : connexion ou création (courriel + mot de passe) -->
+      <div class="gate" data-view="gate">
+        <div class="gate-tabs" role="tablist" data-tabs>
+          <button type="button" role="tab" data-tab="login" aria-selected="true">{g.tabLogin}</button>
+          <button type="button" role="tab" data-tab="signup" aria-selected="false">{g.tabSignup}</button>
+        </div>
+
+        <form class="gate-step" data-step="login" novalidate>
+          <h2>{g.title}</h2>
+          <label for="shop-l-email">{g.email}</label>
+          <input id="shop-l-email" name="email" type="email" autocomplete="username" />
+          <label for="shop-l-pass">{g.password}</label>
+          <input id="shop-l-pass" name="password" type="password" autocomplete="current-password" />
+          <p class="err" role="alert" data-err></p>
+          <button class="btn btn-primary" type="submit">{g.login}</button>
+          {isLive && <button class="link" type="button" data-forgot>{g.forgot}</button>}
+        </form>
+
+        <form class="gate-step" data-step="signup" novalidate hidden>
+          <h2>{g.tabSignup}</h2>
+          <p class="gate-text">{g.text}</p>
+          <label for="shop-s-first">{g.first}</label>
+          <input id="shop-s-first" name="first" type="text" autocomplete="given-name" />
+          <label for="shop-s-last">{g.last}</label>
+          <input id="shop-s-last" name="last" type="text" autocomplete="family-name" />
+          <label for="shop-s-email">{g.email}</label>
+          <input id="shop-s-email" name="email" type="email" autocomplete="email" />
+          <label for="shop-s-pass">{g.password}</label>
+          <input id="shop-s-pass" name="password" type="password" autocomplete="new-password" aria-describedby="shop-s-hint" />
+          <p class="hint" id="shop-s-hint">{g.passwordHint}</p>
+          <p class="err" role="alert" data-err></p>
+          <button class="btn btn-primary" type="submit">{g.signup}</button>
+          <p class="hint">{g.privacy}</p>
+        </form>
+
+        <div class="gate-step" data-step="check" hidden>
+          <h2>{g.checkTitle}</h2>
+          <p class="gate-text" data-check-text></p>
+          {!isLive && <button class="btn btn-ghost" type="button" data-demo-confirm>{g.demoConfirm}</button>}
+          <button class="btn btn-primary" type="button" data-to-login>{g.backToLogin}</button>
+        </div>
+
+        <form class="gate-step" data-step="forgot" novalidate hidden>
+          <h2>{g.forgotTitle}</h2>
+          <p class="gate-text">{g.forgotText}</p>
+          <label for="shop-f-email">{g.email}</label>
+          <input id="shop-f-email" name="email" type="email" autocomplete="username" />
+          <p class="err" role="alert" data-err></p>
+          <button class="btn btn-primary" type="submit">{g.forgotSend}</button>
+          <button class="btn btn-ghost" type="button" data-to-login>{g.backToLogin}</button>
+        </form>
+
+        <form class="gate-step" data-step="newpass" novalidate hidden>
+          <h2>{g.newTitle}</h2>
+          <label for="shop-n-pass">{g.password}</label>
+          <input id="shop-n-pass" name="password" type="password" autocomplete="new-password" />
+          <p class="hint">{g.passwordHint}</p>
+          <p class="err" role="alert" data-err></p>
+          <button class="btn btn-primary" type="submit">{g.newSave}</button>
+        </form>
+      </div>
+
+      <!-- 2. Vitrine, panier, commandes (dessinés par le script) -->
+      <div data-app hidden>
+        <div class="app-bar" data-bar></div>
+        <p class="sr-live" role="status" aria-live="polite" data-live></p>
+        <div data-view="catalog" hidden></div>
+        <div data-view="cart" hidden></div>
+        <div data-view="orders" hidden></div>
+        <!-- Hors de data-view="orders" : cette vue est redessinée à chaque rendu. -->
+        <div data-delete-wrap hidden><DeleteAccount lang={lang} /></div>
+      </div>
+    </div>
+  </section>
+</BaseLayout>
+
+<script>
+  import { KEYS, read, write, esc, fill, money } from '../../lib/shopStore';
+  import { createShopApi } from '../../lib/shopApi';
+  import type { Product, Session, OrderView } from '../../lib/shopApi';
+
+  const root = document.querySelector<HTMLElement>('[data-shop]')!;
+  const cfg = JSON.parse(root.dataset.config!);
+  const t = cfg.t;
+  const api = createShopApi(cfg.lang, { categories: cfg.categories, products: cfg.products });
+
+  const $ = <T extends HTMLElement>(sel: string) => root.querySelector<T>(sel)!;
+  const gate = $('[data-view="gate"]');
+  const app = $('[data-app]');
+  const bar = $('[data-bar]');
+  const live = $('[data-live]');
+  const views = {
+    catalog: $('[data-view="catalog"]'),
+    cart: $('[data-view="cart"]'),
+    orders: $('[data-view="orders"]'),
+  };
+  const deleteWrap = $('[data-delete-wrap]');
+
+  let session: Session | null = null;
+  let cart: Record<string, number> = read(KEYS.cart, {});
+  let categories: { id: string; name: string }[] = cfg.categories;
+  let products: Product[] = [];
+  let byId = new Map<string, Product>();
+  let view: keyof typeof views = 'catalog';
+  let category = 'all';
+  let query = '';
+  let thanks = '';
+  let notice = '';
+
+  const cartCount = () => Object.values(cart).reduce((a, b) => a + b, 0);
+  const saveCart = () => write(KEYS.cart, cart);
+  const say = (msg: string) => {
+    live.textContent = '';
+    setTimeout(() => (live.textContent = msg), 30);
+  };
+  const norm = (s: string) => s.normalize('NFD').replace(/\p{M}/g, '').toLowerCase();
+  const errText = (e: unknown) => {
+    const m = e instanceof Error ? e.message : '';
+    if (m.startsWith('out_of_stock')) return t.errors.outOfStock;
+    if (m.startsWith('too_many_open_orders')) return t.errors.tooMany;
+    if (m === 'rate_limited') return t.errors.rateLimited;
+    if (m === 'send_failed') return t.errors.sendFailed;
+    if (m === 'weak_password') return t.errors.weakPassword;
+    if (m === 'bad_login') return t.gate.badLogin;
+    if (m === 'not_confirmed') return t.gate.notConfirmed;
+    return t.errors.generic;
+  };
+  // Désactive le bouton pendant un appel réseau (évite les doubles envois).
+  async function busy(form: HTMLElement, fn: () => Promise<void>) {
+    const btns = form.querySelectorAll<HTMLButtonElement>('button');
+    btns.forEach((b) => (b.disabled = true));
+    try {
+      await fn();
+    } finally {
+      btns.forEach((b) => (b.disabled = false));
+    }
+  }
+
+  async function refresh() {
+    const c = await api.loadCatalog();
+    categories = c.categories;
+    products = c.products;
+    byId = new Map(products.map((p) => [p.id, p]));
+  }
+
+  // ---------- Compte : connexion / création ----------
+  type StepName = 'login' | 'signup' | 'check' | 'forgot' | 'newpass';
+  const stepEls = {
+    login: $<HTMLFormElement>('[data-step="login"]'),
+    signup: $<HTMLFormElement>('[data-step="signup"]'),
+    check: $<HTMLElement>('[data-step="check"]'),
+    forgot: $<HTMLFormElement>('[data-step="forgot"]'),
+    newpass: $<HTMLFormElement>('[data-step="newpass"]'),
+  };
+  const tabs = $('[data-tabs]');
+  const showStep = (name: StepName) => {
+    (Object.keys(stepEls) as StepName[]).forEach((k) => (stepEls[k].hidden = k !== name));
+    tabs.hidden = name !== 'login' && name !== 'signup';
+    tabs.querySelectorAll<HTMLElement>('[data-tab]').forEach((b) => b.setAttribute('aria-selected', String(b.dataset.tab === name)));
+    stepEls[name].querySelector<HTMLInputElement>('input')?.focus();
+  };
+  const fail = (form: HTMLElement, msg: string) => {
+    form.querySelector<HTMLElement>('[data-err]')!.textContent = msg;
+  };
+  const validEmail = (v: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.trim());
+  let signupEmail = '';
+
+  tabs.addEventListener('click', (e) => {
+    const b = (e.target as HTMLElement).closest<HTMLElement>('[data-tab]');
+    if (b) showStep(b.dataset.tab as StepName);
+  });
+  root.querySelectorAll('[data-to-login]').forEach((b) => b.addEventListener('click', () => showStep('login')));
+  root.querySelector('[data-forgot]')?.addEventListener('click', () => showStep('forgot'));
+
+  stepEls.login.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const f = stepEls.login;
+    fail(f, '');
+    if (!validEmail(f.email.value) || !f.password.value) return fail(f, t.gate.badLogin);
+    busy(f, async () => {
+      try {
+        signIn(await api.signIn(f.email.value, f.password.value));
+        f.reset();
+      } catch (err) {
+        fail(f, errText(err));
+      }
+    });
+  });
+
+  stepEls.signup.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const f = stepEls.signup;
+    fail(f, '');
+    const first = f.first.value.trim();
+    if (!first) return fail(f, t.gate.badName);
+    if (!validEmail(f.email.value)) return fail(f, t.gate.badEmail);
+    if (f.password.value.length < 8) return fail(f, t.gate.badPassword);
+    busy(f, async () => {
+      try {
+        const r = await api.signUp(f.email.value, f.password.value, first, f.last.value.trim());
+        if (!r.needsConfirm) {
+          const s = await api.restoreSession(); // confirmation courriel désactivée : déjà connecté
+          if (s) return signIn(s);
+        }
+        signupEmail = f.email.value.trim().toLowerCase();
+        stepEls.check.querySelector('[data-check-text]')!.textContent = fill(t.gate.checkText, { email: signupEmail });
+        f.reset();
+        showStep('check');
+      } catch (err) {
+        fail(f, errText(err));
+      }
+    });
+  });
+
+  stepEls.check.querySelector('[data-demo-confirm]')?.addEventListener('click', async () => {
+    await api.demoConfirm?.(signupEmail);
+    stepEls.login.email.value = signupEmail;
+    showStep('login');
+  });
+
+  stepEls.forgot.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const f = stepEls.forgot;
+    fail(f, '');
+    if (!validEmail(f.email.value)) return fail(f, t.gate.badEmail);
+    busy(f, async () => {
+      try {
+        await api.resetPassword(f.email.value);
+        fail(f, t.gate.forgotSent); // même message, que le compte existe ou non
+      } catch (err) {
+        fail(f, errText(err));
+      }
+    });
+  });
+
+  // Lien « mot de passe oublié » cliqué dans le courriel : le site rouvre sur ce formulaire.
+  api.onPasswordRecovery(() => {
+    gate.hidden = false;
+    app.hidden = true;
+    showStep('newpass');
+  });
+
+  stepEls.newpass.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const f = stepEls.newpass;
+    fail(f, '');
+    if (f.password.value.length < 8) return fail(f, t.gate.badPassword);
+    busy(f, async () => {
+      try {
+        await api.setNewPassword(f.password.value);
+        f.reset();
+        const s = await api.restoreSession();
+        if (s) signIn(s);
+        else showStep('login');
+      } catch (err) {
+        fail(f, errText(err));
+      }
+    });
+  });
+
+  function signIn(s: Session) {
+    session = s;
+    cart = {};
+    saveCart();
+    go('catalog');
+  }
+
+  async function signOut() {
+    await api.signOut();
+    session = null;
+    cart = {};
+    saveCart();
+    gate.hidden = false;
+    app.hidden = true;
+    showStep('login');
+  }
+
+  // ---------- Navigation ----------
+  async function go(next: keyof typeof views) {
+    view = next;
+    await render();
+    window.scrollTo({ top: root.offsetTop - 80, behavior: 'smooth' });
+  }
+
+  async function render() {
+    if (!session) {
+      gate.hidden = false;
+      app.hidden = true;
+      return;
+    }
+    gate.hidden = true;
+    app.hidden = false;
+    (Object.keys(views) as (keyof typeof views)[]).forEach((k) => (views[k].hidden = k !== view));
+    deleteWrap.hidden = view !== 'orders';
+    try {
+      await refresh();
+    } catch {
+      views[view].innerHTML = `<p class="notice">${t.errors.generic}</p>`;
+      return;
+    }
+    renderBar();
+    if (view === 'catalog') renderCatalog();
+    if (view === 'cart') renderCart();
+    if (view === 'orders') await renderOrders();
+  }
+
+  function renderBar() {
+    const n = cartCount();
+    const tab = (id: keyof typeof views, label: string, extra = '') =>
+      `<button type="button" class="tab" data-go="${id}" ${view === id ? 'aria-current="page"' : ''}>${label}${extra}</button>`;
+    bar.innerHTML = `
+      <p class="hello">${esc(fill(t.bar.hello, { name: session!.first }))}</p>
+      <div class="tabs">
+        ${tab('catalog', t.bar.catalog)}
+        ${tab('cart', t.bar.cart, n ? ` <span class="badge">${n}</span>` : '')}
+        ${tab('orders', t.bar.orders)}
+        <button type="button" class="tab quiet" data-out>${t.bar.out}</button>
+      </div>`;
+  }
+
+  bar.addEventListener('click', (e) => {
+    const el = (e.target as HTMLElement).closest<HTMLElement>('[data-go],[data-out]');
+    if (!el) return;
+    thanks = '';
+    notice = '';
+    if (el.hasAttribute('data-out')) signOut();
+    else go(el.dataset.go as keyof typeof views);
+  });
+
+  // ---------- Vitrine ----------
+  function stockLabel(a: number) {
+    if (a === 0) return `<span class="stock out">${t.catalog.soldOut}</span>`;
+    if (a <= 3) return `<span class="stock low">${t.catalog.last}</span>`;
+    return '';
+  }
+
+  function card(p: Product) {
+    const a = p.stock;
+    const free = a - (cart[p.id] ?? 0);
+    const price = cfg.showPrices ? `<span class="price">${money(p.price, cfg.lang)}</span>` : '';
+    const tags = p.tags.map((x) => `<span class="tag">${esc(x)}</span>`).join('');
+    const action =
+      a === 0
+        ? ''
+        : `<div class="buy">
+            <div class="qty" role="group" aria-label="${esc(p.name)}">
+              <button type="button" data-act="dec" aria-label="${t.catalog.less}">−</button>
+              <output data-q>1</output>
+              <button type="button" data-act="inc" aria-label="${t.catalog.more}">+</button>
+            </div>
+            <button type="button" class="btn btn-primary add" data-act="add" ${free <= 0 ? 'disabled' : ''}>${free <= 0 ? t.catalog.max : t.catalog.add}</button>
+          </div>`;
+    return `<li class="card ${a === 0 ? 'is-out' : ''}" data-id="${esc(p.id)}">
+      <div class="ph" aria-hidden="true"><span>${t.catalog.photo}</span></div>
+      <div class="card-body">
+        <div class="card-head"><h3>${esc(p.name)}</h3>${price}</div>
+        <p class="format">${esc(p.format)}</p>
+        <p class="tags">${tags}${stockLabel(a)}</p>
+        ${action}
+      </div>
+    </li>`;
+  }
+
+  function filtered() {
+    const q = norm(query.trim());
+    return products.filter((p) => (category === 'all' || p.category === category) && (!q || norm(`${p.name} ${p.format}`).includes(q)));
+  }
+
+  function renderCatalog() {
+    const chip = (id: string, label: string, n: number) =>
+      `<button type="button" class="chip" data-cat="${esc(id)}" aria-pressed="${category === id}">${esc(label)} <span>${n}</span></button>`;
+    views.catalog.innerHTML = `
+      ${api.live ? '' : `<p class="sample-note">${t.catalog.sample}</p>`}
+      <label class="visually-hidden" for="shop-search">${t.catalog.search}</label>
+      <input id="shop-search" class="search" type="search" placeholder="${t.catalog.search}" value="${esc(query)}" autocomplete="off" />
+      <div class="chips">
+        ${chip('all', t.catalog.all, products.length)}
+        ${categories.map((c) => chip(c.id, c.name, products.filter((p) => p.category === c.id).length)).join('')}
+      </div>
+      <ul class="grid" data-grid></ul>`;
+    renderGrid();
+  }
+
+  function renderGrid() {
+    const list = filtered();
+    $('[data-grid]').innerHTML = list.length ? list.map(card).join('') : `<li class="none">${t.catalog.none}</li>`;
+  }
+
+  views.catalog.addEventListener('input', (e) => {
+    const el = e.target as HTMLInputElement;
+    if (el.id !== 'shop-search') return;
+    query = el.value;
+    renderGrid();
+  });
+
+  views.catalog.addEventListener('click', (e) => {
+    const target = e.target as HTMLElement;
+    const chipEl = target.closest<HTMLElement>('[data-cat]');
+    if (chipEl) {
+      category = chipEl.dataset.cat!;
+      views.catalog.querySelectorAll<HTMLElement>('[data-cat]').forEach((c) => c.setAttribute('aria-pressed', String(c === chipEl)));
+      renderGrid();
+      return;
+    }
+    const btn = target.closest<HTMLButtonElement>('[data-act]');
+    const li = btn?.closest<HTMLElement>('[data-id]');
+    if (!btn || !li) return;
+    const p = byId.get(li.dataset.id!);
+    if (!p) return;
+    const q = li.querySelector<HTMLOutputElement>('[data-q]')!;
+    const room = p.stock - (cart[p.id] ?? 0);
+    let n = Number(q.value);
+    if (btn.dataset.act === 'dec') q.value = String(Math.max(1, n - 1));
+    if (btn.dataset.act === 'inc') q.value = String(Math.min(Math.max(room, 1), n + 1));
+    if (btn.dataset.act === 'add') {
+      n = Math.min(n, room);
+      if (n < 1) return;
+      cart[p.id] = (cart[p.id] ?? 0) + n;
+      saveCart();
+      renderBar();
+      say(`${t.catalog.added} : ${p.name} × ${n}`);
+      li.outerHTML = card(p);
+      views.catalog.querySelector<HTMLElement>(`[data-id="${CSS.escape(p.id)}"] .add`)?.classList.add('flash');
+    }
+  });
+
+  // ---------- Panier ----------
+  function sanitizeCart() {
+    let changed = false;
+    for (const id of Object.keys(cart)) {
+      const p = byId.get(id);
+      const max = p ? p.stock : 0;
+      if (!p || cart[id] > max) {
+        changed = true;
+        if (max > 0) cart[id] = max;
+        else delete cart[id];
+      }
+    }
+    if (changed) {
+      saveCart();
+      notice = t.cart.changed;
+    }
+  }
+
+  function renderCart() {
+    sanitizeCart();
+    renderBar();
+    const ids = Object.keys(cart);
+    if (!ids.length) {
+      views.cart.innerHTML = `<h2>${t.cart.title}</h2>${notice ? `<p class="notice">${notice}</p>` : ''}<p class="empty">${t.cart.empty}</p>
+        <button type="button" class="btn btn-ghost" data-go-catalog>${t.cart.back}</button>`;
+      notice = '';
+      return;
+    }
+    let total = 0;
+    const lines = ids
+      .map((id) => {
+        const p = byId.get(id)!;
+        total += p.price * cart[id];
+        const free = p.stock - cart[id];
+        return `<li class="line" data-id="${esc(id)}">
+          <div><strong>${esc(p.name)}</strong><span class="format">${esc(p.format)}</span></div>
+          <div class="qty" role="group" aria-label="${esc(p.name)}">
+            <button type="button" data-act="dec" aria-label="${t.catalog.less}">−</button>
+            <output>${cart[id]}</output>
+            <button type="button" data-act="inc" aria-label="${t.catalog.more}" ${free <= 0 ? 'disabled' : ''}>+</button>
+          </div>
+          ${cfg.showPrices ? `<span class="price">${money(p.price * cart[id], cfg.lang)}</span>` : ''}
+          <button type="button" class="link" data-act="del">${t.cart.remove}</button>
+        </li>`;
+      })
+      .join('');
+    views.cart.innerHTML = `
+      <h2>${t.cart.title}</h2>
+      ${notice ? `<p class="notice">${notice}</p>` : ''}
+      <ul class="lines">${lines}</ul>
+      <label for="shop-note">${t.cart.note}</label>
+      <textarea id="shop-note" rows="2" maxlength="200" placeholder="${t.cart.notePh}"></textarea>
+      <p class="hint">${esc(fill(t.cart.pickup, { hours: cfg.hours }))}</p>
+      ${cfg.showPrices ? `<p class="total"><span>${t.cart.total}</span><strong>${money(total, cfg.lang)}</strong></p>` : ''}
+      <div class="row">
+        <button type="button" class="btn btn-primary" data-send>${t.cart.send}</button>
+        <button type="button" class="btn btn-ghost" data-go-catalog>${t.cart.back}</button>
+      </div>`;
+    notice = '';
+  }
+
+  views.cart.addEventListener('click', (e) => {
+    const target = e.target as HTMLElement;
+    if (target.closest('[data-go-catalog]')) return void go('catalog');
+    if (target.closest('[data-send]')) return void sendOrder();
+    const btn = target.closest<HTMLElement>('[data-act]');
+    const li = btn?.closest<HTMLElement>('[data-id]');
+    if (!btn || !li) return;
+    const id = li.dataset.id!;
+    const note = views.cart.querySelector<HTMLTextAreaElement>('#shop-note')?.value ?? '';
+    if (btn.dataset.act === 'inc') cart[id] = (cart[id] ?? 0) + 1;
+    if (btn.dataset.act === 'dec') cart[id] = (cart[id] ?? 1) - 1;
+    if (btn.dataset.act === 'del' || cart[id] <= 0) delete cart[id];
+    saveCart();
+    renderCart();
+    const box = views.cart.querySelector<HTMLTextAreaElement>('#shop-note');
+    if (box) box.value = note;
+  });
+
+  async function sendOrder() {
+    const ids = Object.keys(cart);
+    if (!ids.length || !session) return;
+    const note = (views.cart.querySelector<HTMLTextAreaElement>('#shop-note')?.value ?? '').trim();
+    const btn = views.cart.querySelector<HTMLButtonElement>('[data-send]');
+    if (btn) btn.disabled = true;
+    try {
+      const r = await api.placeOrder(ids.map((id) => ({ id, qty: cart[id] })), note);
+      cart = {};
+      saveCart();
+      thanks = fill(t.orders.thanks, { id: r.number });
+      await go('orders');
+    } catch (err) {
+      notice = errText(err);
+      await render(); // recharge le stock réel et ajuste le panier
+    }
+  }
+
+  // ---------- Mes commandes ----------
+  async function renderOrders() {
+    renderBar();
+    let mine: OrderView[] = [];
+    try {
+      mine = await api.myOrders();
+    } catch {
+      views.orders.innerHTML = `<p class="notice">${t.errors.generic}</p>`;
+      return;
+    }
+    const fmt = new Intl.DateTimeFormat(cfg.lang === 'fr' ? 'fr-CA' : 'en-CA', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'America/Toronto' });
+    const list = mine
+      .map((o) => {
+        const items = o.items.map((i) => `<li>${i.qty} × ${esc(i.name)} <span class="format">${esc(i.format)}</span></li>`).join('');
+        const cancel = o.status === 'new' ? `<button type="button" class="link" data-cancel="${esc(o.id)}">${t.orders.cancel}</button>` : '';
+        return `<li class="order">
+          <div class="order-head"><strong>${esc(o.number)}</strong><span class="status s-${o.status}">${t.statuses[o.status]}</span></div>
+          <p class="format">${esc(fill(t.orders.placed, { date: fmt.format(new Date(o.createdAt)) }))}</p>
+          <ul class="items">${items}</ul>
+          ${o.note ? `<p class="format">${t.orders.note} : ${esc(o.note)}</p>` : ''}
+          <div class="row"><button type="button" class="btn btn-ghost" data-again="${esc(o.id)}">${t.orders.again}</button>${cancel}</div>
+        </li>`;
+      })
+      .join('');
+    views.orders.innerHTML = `
+      <h2>${t.orders.title}</h2>
+      ${thanks ? `<p class="notice ok" role="status">${esc(thanks)}</p>` : ''}
+      ${mine.length ? `<ul class="orders">${list}</ul>` : `<p class="empty">${t.orders.empty}</p>`}`;
+    thanks = '';
+    orderCache = mine;
+  }
+  let orderCache: OrderView[] = [];
+
+  views.orders.addEventListener('click', async (e) => {
+    const target = e.target as HTMLElement;
+    const cancel = target.closest<HTMLElement>('[data-cancel]');
+    const again = target.closest<HTMLElement>('[data-again]');
+    if (cancel) {
+      try {
+        await api.cancelOrder(cancel.dataset.cancel!);
+      } catch {
+        /* déjà en préparation : l'affichage se met à jour ci-dessous */
+      }
+      await render();
+    }
+    if (again) {
+      const o = orderCache.find((x) => x.id === again.dataset.again);
+      o?.items.forEach((i) => {
+        const p = byId.get(i.id);
+        if (!p) return;
+        const room = p.stock - (cart[i.id] ?? 0);
+        if (room > 0) cart[i.id] = (cart[i.id] ?? 0) + Math.min(i.qty, room);
+      });
+      saveCart();
+      notice = '';
+      go('cart');
+    }
+  });
+
+  // ---------- Supprimer mon compte (Loi 25) ----------
+  document.addEventListener('gr:delete-account', (e) => {
+    e.preventDefault(); // dit au bouton que la page a répondu
+    const { resolve, reject } = (e as CustomEvent<{ resolve: () => void; reject: (err: unknown) => void }>).detail;
+    api.deleteAccount().then(resolve, reject);
+  });
+
+  // Compte supprimé : le message reste 3 s, puis la page repart à zéro (écran de connexion).
+  document.addEventListener('gr:account-deleted', () => {
+    cart = {};
+    saveCart();
+    setTimeout(() => location.reload(), 3000);
+  });
+
+  // Une commande change ailleurs (écran employé, autre onglet) : la vue se met à jour.
+  api.onChange(() => {
+    if (session && view === 'orders') render();
+  });
+
+  api.restoreSession().then((s) => {
+    session = s;
+    if (s) render();
+    else showStep('login');
+  }).catch(() => showStep('login'));
+</script>
+
+<style is:global>
+  .shop-demo {
+    margin: 0 0 32px;
+    padding: 12px 16px;
+    border: 1px dashed var(--line-strong);
+    border-radius: var(--radius);
+    font-size: 0.88rem;
+    color: var(--muted);
+  }
+
+  .shop [hidden] {
+    display: none !important;
+  }
+
+  .shop h2 {
+    font-size: clamp(1.8rem, 4vw, 2.6rem);
+    margin: 0 0 12px;
+  }
+
+  .shop label {
+    display: block;
+    margin: 18px 0 6px;
+    font-size: 0.88rem;
+    font-weight: 500;
+  }
+
+  .shop input[type='tel'],
+  .shop input[type='text'],
+  .shop input[type='search'],
+  .shop textarea {
+    width: 100%;
+    padding: 14px 16px;
+    border: 1px solid var(--line-strong);
+    border-radius: var(--radius);
+    background: var(--surface);
+    color: var(--text);
+    font: inherit;
+    font-size: 1rem;
+  }
+
+  .shop input:focus-visible,
+  .shop textarea:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+
+  .shop .hint {
+    margin: 8px 0 0;
+    font-size: 0.82rem;
+    color: var(--muted);
+  }
+
+  .shop .err {
+    min-height: 1.2em;
+    margin: 8px 0 0;
+    font-size: 0.88rem;
+    color: #f08a7e;
+  }
+
+  /* Accès */
+  .gate {
+    max-width: 460px;
+    margin-inline: auto;
+  }
+
+  .gate-step {
+    display: grid;
+    padding: clamp(22px, 4vw, 36px);
+    border: 1px solid var(--line);
+    border-radius: calc(var(--radius) + 6px);
+    background: var(--surface);
+  }
+
+  .gate-step .btn {
+    margin-top: 14px;
+    justify-self: stretch;
+  }
+
+  .gate-tabs {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 4px;
+    margin-bottom: 14px;
+    padding: 4px;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    background: var(--surface);
+  }
+
+  .gate-tabs button {
+    padding: 10px 12px;
+    border: 0;
+    border-radius: 999px;
+    background: transparent;
+    color: var(--muted);
+    font: inherit;
+    font-size: 0.92rem;
+    font-weight: 500;
+    cursor: pointer;
+  }
+
+  .gate-tabs button[aria-selected='true'] {
+    background: var(--accent-soft);
+    color: var(--text);
+  }
+
+  .gate-step .link {
+    justify-self: center;
+    margin-top: 12px;
+  }
+
+  .gate-text {
+    margin: 0;
+    color: var(--muted);
+  }
+
+  /* Barre */
+  .app-bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px 24px;
+    padding-bottom: 20px;
+    margin-bottom: 28px;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .hello {
+    margin: 0;
+    font-family: var(--font-display);
+    font-size: 1.4rem;
+  }
+
+  .tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .tab {
+    padding: 9px 16px;
+    border: 1px solid transparent;
+    border-radius: 999px;
+    background: transparent;
+    color: var(--muted);
+    font: inherit;
+    font-size: 0.92rem;
+    font-weight: 500;
+    cursor: pointer;
+  }
+
+  .tab:hover {
+    color: var(--text);
+  }
+
+  .tab[aria-current='page'] {
+    color: var(--text);
+    background: var(--accent-soft);
+  }
+
+  .tab.quiet {
+    border-color: var(--line);
+  }
+
+  .badge {
+    display: inline-grid;
+    place-items: center;
+    min-width: 20px;
+    height: 20px;
+    margin-left: 4px;
+    padding: 0 6px;
+    border-radius: 999px;
+    background: var(--accent);
+    color: var(--accent-ink);
+    font-size: 0.74rem;
+    font-weight: 700;
+  }
+
+  .sr-live {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+
+  /* Vitrine */
+  .sample-note {
+    margin: 0 0 14px;
+    font-size: 0.8rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  .chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 16px 0 28px;
+  }
+
+  .chip {
+    padding: 9px 16px;
+    border: 1px solid var(--line-strong);
+    border-radius: 999px;
+    background: transparent;
+    color: var(--text);
+    font: inherit;
+    font-size: 0.9rem;
+    cursor: pointer;
+  }
+
+  .chip span {
+    margin-left: 4px;
+    color: var(--muted);
+    font-size: 0.8rem;
+  }
+
+  .chip[aria-pressed='true'] {
+    border-color: var(--accent);
+    background: var(--accent-soft);
+  }
+
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 250px), 1fr));
+    gap: 18px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .card {
+    display: grid;
+    grid-template-rows: auto 1fr;
+    border: 1px solid var(--line);
+    border-radius: calc(var(--radius) + 2px);
+    background: var(--surface);
+    overflow: hidden;
+  }
+
+  .card.is-out {
+    opacity: 0.6;
+  }
+
+  .ph {
+    display: grid;
+    place-items: center;
+    aspect-ratio: 16 / 10;
+    background:
+      radial-gradient(70% 90% at 30% 20%, rgba(111, 214, 143, 0.14), transparent 70%),
+      var(--surface-2);
+    font-size: 0.78rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  .card-body {
+    display: grid;
+    align-content: start;
+    gap: 6px;
+    padding: 16px;
+  }
+
+  .card-head {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    align-items: baseline;
+  }
+
+  .card h3 {
+    margin: 0;
+    font-family: var(--font-display);
+    font-size: 1.25rem;
+    font-weight: 400;
+    line-height: 1.15;
+  }
+
+  .shop .format {
+    margin: 0;
+    font-size: 0.85rem;
+    color: var(--muted);
+  }
+
+  .tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin: 0;
+    min-height: 1.4em;
+  }
+
+  .tag,
+  .stock {
+    padding: 2px 9px;
+    border-radius: 999px;
+    border: 1px solid var(--line-strong);
+    font-size: 0.72rem;
+    color: var(--muted);
+  }
+
+  .stock.low {
+    border-color: #c9a64a;
+    color: #e3c772;
+  }
+
+  .stock.out {
+    border-color: #b86a5f;
+    color: #f08a7e;
+  }
+
+  .buy {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 8px;
+  }
+
+  .buy .add {
+    flex: 1;
+    padding-inline: 12px;
+  }
+
+  .buy .add:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  .add.flash {
+    animation: shop-flash 0.9s ease-out;
+  }
+
+  .qty {
+    display: inline-flex;
+    align-items: center;
+    border: 1px solid var(--line-strong);
+    border-radius: 999px;
+  }
+
+  .qty button {
+    width: 38px;
+    height: 38px;
+    border: 0;
+    background: transparent;
+    color: var(--text);
+    font-size: 1.15rem;
+    cursor: pointer;
+  }
+
+  .qty button:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+  }
+
+  .qty output {
+    min-width: 24px;
+    text-align: center;
+    font-weight: 600;
+  }
+
+  .shop .price {
+    font-weight: 600;
+    color: var(--accent);
+  }
+
+  .none,
+  .empty {
+    color: var(--muted);
+  }
+
+  /* Panier et commandes */
+  .lines,
+  .orders,
+  .items {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .lines {
+    border-top: 1px solid var(--line);
+  }
+
+  .line {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto auto auto;
+    align-items: center;
+    gap: 14px;
+    padding: 16px 0;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .line .format {
+    display: block;
+  }
+
+  .shop .link {
+    padding: 4px;
+    border: 0;
+    background: none;
+    color: var(--muted);
+    font: inherit;
+    font-size: 0.85rem;
+    text-decoration: underline;
+    cursor: pointer;
+  }
+
+  .shop .link:hover {
+    color: var(--text);
+  }
+
+  .shop textarea {
+    resize: vertical;
+  }
+
+  .total {
+    display: flex;
+    justify-content: space-between;
+    margin: 20px 0 0;
+    font-size: 1.1rem;
+  }
+
+  .shop .row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px;
+    margin-top: 22px;
+  }
+
+  .notice {
+    margin: 0 0 18px;
+    padding: 12px 16px;
+    border-radius: var(--radius);
+    background: rgba(201, 166, 74, 0.12);
+    color: #e3c772;
+    font-size: 0.92rem;
+  }
+
+  .notice.ok {
+    background: var(--accent-soft);
+    color: var(--accent);
+  }
+
+  .orders {
+    display: grid;
+    gap: 16px;
+  }
+
+  .order {
+    padding: 20px;
+    border: 1px solid var(--line);
+    border-radius: calc(var(--radius) + 2px);
+    background: var(--surface);
+  }
+
+  .order-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .items {
+    margin: 12px 0;
+    display: grid;
+    gap: 4px;
+  }
+
+  .status {
+    padding: 4px 12px;
+    border-radius: 999px;
+    border: 1px solid var(--line-strong);
+    font-size: 0.78rem;
+    font-weight: 600;
+  }
+
+  .s-new {
+    color: #e3c772;
+    border-color: #c9a64a;
+  }
+
+  .s-preparing {
+    color: #8fc2ff;
+    border-color: #5a8fd1;
+  }
+
+  .s-ready {
+    color: var(--accent-ink);
+    background: var(--accent);
+    border-color: var(--accent);
+  }
+
+  .s-pickedup,
+  .s-cancelled {
+    color: var(--muted);
+  }
+
+  @keyframes shop-flash {
+    0% { box-shadow: 0 0 0 0 rgba(111, 214, 143, 0.7); }
+    100% { box-shadow: 0 0 0 14px rgba(111, 214, 143, 0); }
+  }
+
+  @media (max-width: 560px) {
+    .ph {
+      aspect-ratio: 21 / 8;
+    }
+
+    .line {
+      grid-template-columns: minmax(0, 1fr) auto;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .add.flash {
+      animation: none;
+    }
+  }
+</style>

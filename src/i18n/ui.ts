@@ -1,7 +1,7 @@
 import { site } from '../data/site';
 
 export type Lang = 'fr' | 'en';
-export type PageKey = 'home' | 'about' | 'news' | 'events' | 'visit';
+export type PageKey = 'home' | 'about' | 'news' | 'events' | 'visit' | 'shop' | 'staff' | 'privacy';
 
 // Dossier de base du site (vide en local et sur le vrai domaine, « /green-room-oka » pour l'aperçu).
 const base = import.meta.env.BASE_URL.replace(/\/$/, '');
@@ -14,6 +14,9 @@ export const routes: Record<PageKey, Record<Lang, string>> = {
   news: { fr: withBase('/nouveautes/'), en: withBase('/en/news/') },
   events: { fr: withBase('/evenements/'), en: withBase('/en/events/') },
   visit: { fr: withBase('/visiter/'), en: withBase('/en/visit/') },
+  shop: { fr: withBase('/boutique/'), en: withBase('/en/shop/') },
+  staff: { fr: withBase('/commandes/'), en: withBase('/en/staff/') },
+  privacy: { fr: withBase('/confidentialite/'), en: withBase('/en/privacy/') },
 };
 
 // Date « 2026-11-14 » → éléments affichables, sans décalage de fuseau.
@@ -80,8 +83,11 @@ export const ui = {
       visit: { title: 'Nous visiter · The Green Room', description: 'Heures, adresse, itinéraire et coordonnées de The Green Room, à Oka.' },
       news: { title: 'Nouveautés · The Green Room', description: 'Les dernières nouvelles de The Green Room, à Oka.' },
       events: { title: 'Événements · The Green Room', description: 'Spectacles et soirées à venir à The Green Room, à Oka.' },
+      shop: { title: 'Vitrine · The Green Room', description: 'Parcourez les produits et commandez pour les ramasser sur place à The Green Room, à Oka.' },
+      staff: { title: 'Commandes (employés) · The Green Room', description: 'Écran de préparation des commandes.' },
+      privacy: { title: 'Confidentialité · The Green Room', description: 'Comment The Green Room recueille, utilise et protège vos renseignements personnels.' },
     },
-    nav: { home: 'Accueil', about: 'À propos', news: 'Nouveautés', events: 'Événements', visit: 'Nous visiter', menu: 'Menu', close: 'Fermer' },
+    nav: { home: 'Accueil', about: 'À propos', news: 'Nouveautés', events: 'Événements', shop: 'Vitrine', visit: 'Nous visiter', menu: 'Menu', close: 'Fermer' },
     sample: 'Exemple',
     follow: {
       text: 'Pour ne rien manquer, suivez-nous sur Instagram.',
@@ -158,6 +164,7 @@ export const ui = {
       follow: 'Suivez-nous',
       ageNote: `Réservé aux ${site.minAge} ans et plus.`,
       rights: 'Tous droits réservés.',
+      privacy: 'Confidentialité',
     },
   },
   en: {
@@ -167,8 +174,11 @@ export const ui = {
       visit: { title: 'Visit · The Green Room', description: 'Hours, address, directions and contact info for The Green Room in Oka.' },
       news: { title: 'News · The Green Room', description: 'The latest news from The Green Room in Oka.' },
       events: { title: 'Events · The Green Room', description: 'Upcoming shows and nights out at The Green Room in Oka.' },
+      shop: { title: 'Shop · The Green Room', description: 'Browse products and order for pickup at The Green Room in Oka.' },
+      staff: { title: 'Orders (staff) · The Green Room', description: 'Order preparation screen.' },
+      privacy: { title: 'Privacy · The Green Room', description: 'How The Green Room collects, uses and protects your personal information.' },
     },
-    nav: { home: 'Home', about: 'About', news: 'News', events: 'Events', visit: 'Visit us', menu: 'Menu', close: 'Close' },
+    nav: { home: 'Home', about: 'About', news: 'News', events: 'Events', shop: 'Shop', visit: 'Visit us', menu: 'Menu', close: 'Close' },
     sample: 'Example',
     follow: {
       text: "Don't miss a thing: follow us on Instagram.",
@@ -245,6 +255,7 @@ export const ui = {
       follow: 'Follow us',
       ageNote: `For ages ${site.minAge} and up.`,
       rights: 'All rights reserved.',
+      privacy: 'Privacy',
     },
   },
 } as const;
