@@ -30,7 +30,7 @@ export const site = {
 
   // Effets visuels de l'accueil. Mettre `smoke: false` pour retirer la fumée.
   // À valider avec l'avocat, comme le slogan et l'âge minimum.
-  effects: { smoke: true },
+  effects: { smoke: false },
 
   // Vitrine et commande à ramasser (prototype). `enabled: false` retire la section du site.
   // `showPrices: false` : aucun prix affiché (le brief demande de n'en montrer aucun). À valider avec l'avocat.
